@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+gunicorn
+jinja2
+python-multipart
+pandas
+numpy
+statsmodels
+joblib
+sqlalchemy
+psycopg2-binary
+passlib[bcrypt]
+python-jose
+python-dotenv
+pulp
+apscheduler
