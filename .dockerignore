@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Data and models (we only want explicit directories like data/external)
+data/uploads/*
+data/processed/*
+data/runs/*
+!data/external/sample_fuel_data.csv
+!data/processed/kenyan_oil_prices_monthly_clean.csv
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project files
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+readme.md
+ROADMAP.md
+
+# Log files
+*.log

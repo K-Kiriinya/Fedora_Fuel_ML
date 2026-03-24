@@ -1,0 +1,70 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov httpx
+        
+    - name: Run code validation
+      run: |
+        # Quick validation using the test_model.py script that exists in the repo
+        python test_model.py
+        
+    # Example placeholder for pytest when tests are developed
+    # - name: Run tests with pytest
+    #   run: |
+    #     pytest --cov=src/fuel_pricing tests/
+        
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: username/fedora-fuel-ml:latest,username/fedora-fuel-ml:${{ github.sha }}
+
+  # deploy:
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Deploy to production server
+  #     uses: appleboy/ssh-action@master
+  #     with:
+  #       host: ${{ secrets.PROD_SERVER_IP }}
+  #       username: ${{ secrets.PROD_USERNAME }}
+  #       key: ${{ secrets.PROD_SSH_KEY }}
+  #       script: |
+  #         docker pull username/fedora-fuel-ml:latest
+  #         docker-compose -f docker-compose.prod.yml up -d --build

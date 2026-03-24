@@ -123,10 +123,9 @@ class FuelSARIMAXModel:
         y_true_safe = np.where(y_true == 0, 1e-10, y_true)
         mape = np.mean(np.abs((y_true - y_pred) / y_true_safe)) * 100
 
-        # return self.metrics
         self.metrics = {
-            "MAE": round(self.metrics['MAE'], 4),
-            "RMSE": round(self.metrics['RMSE'], 4),
+            "MAE": round(float(mae), 4),
+            "RMSE": round(float(rmse), 4),
             "MAPE": round(float(mape), 4)
         }
 
