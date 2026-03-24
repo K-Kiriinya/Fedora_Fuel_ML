@@ -10,7 +10,16 @@ Features:
 - JWT Authentication
 """
 
-from fastapi import FastAPI, UploadFile, File, Request, Form, Depends, HTTPException, status
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    File,
+    Request,
+    Form,
+    Depends,
+    HTTPException,
+    status,
+)
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -34,7 +43,7 @@ from fuel_pricing.api.auth import (
     authenticate_user,
     create_access_token,
     get_current_user,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 
 # Configure logging
@@ -57,7 +66,7 @@ METRICS_PATH = PROCESSED_DIR / "metrics.pkl"
 app = FastAPI(
     title="Fedora Fuel ML API",
     description="SARIMAX-based fuel price forecasting system",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # Mount static files
@@ -78,20 +87,21 @@ ALLOWED_EXTENSIONS = {".csv"}
 # HOME ROUTE
 # -------------------------------------------------------
 
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     """
     Render homepage.
     """
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
+        request=request, name="index.html", context={"request": request}
     )
 
 
 # -------------------------------------------------------
 # AUTHENTICATION
 # -------------------------------------------------------
+
 
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
@@ -120,6 +130,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
 # FILE UPLOAD
 # -------------------------------------------------------
 
+
 def validate_csv_file(file: UploadFile) -> None:
     """
     Validate uploaded CSV file.
@@ -137,7 +148,7 @@ def validate_csv_file(file: UploadFile) -> None:
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid file type. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed."
+            detail=f"Invalid file type. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.",
         )
 
     # Sanitize filename to prevent path traversal
@@ -168,7 +179,7 @@ async def upload_file(file: UploadFile = File(...)):
                     file_path.unlink()  # Delete incomplete file
                     raise HTTPException(
                         status_code=400,
-                        detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024*1024)}MB"
+                        detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024*1024)}MB",
                     )
                 buffer.write(chunk)
 
@@ -211,61 +222,67 @@ def get_training_data() -> pd.DataFrame:
             df["date"] = pd.to_datetime(df["date"])
             df.set_index("date", inplace=True)
             return df
-            
+
     # 2. Main dataset (local_prices)
     prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
     if not prices_file.exists():
         raise Exception("System Error: Default Processed local prices dataset missing.")
-        
+
     df = pd.read_csv(prices_file)
-    
+
     if "Local Price in KSH" in df.columns:
         df["price"] = df["Local Price in KSH"]
     elif "PMS" in df.columns:
         df["price"] = df["PMS"]
-        
+
     if "month" in df.columns:
         df["month"] = pd.to_datetime(df["month"])
     else:
         df["month"] = pd.to_datetime(df["date"])
-        
+
     # 3. Dynamically merge ALL market_indicators
     indicators_dir = PROCESSED_DIR / "market_indicators"
     if indicators_dir.exists() and indicators_dir.is_dir():
         for csv_path in indicators_dir.glob("*.csv"):
             try:
                 df_ind = pd.read_csv(csv_path)
-                if 'month' in df_ind.columns:
-                    df_ind['month'] = pd.to_datetime(df_ind['month'])
-                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + ['month']
-                    df = pd.merge(df, df_ind[cols_to_use], on='month', how='left')
-                elif 'date' in df_ind.columns:
-                    df_ind['month'] = pd.to_datetime(df_ind['date'])
-                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + ['month']
-                    df = pd.merge(df, df_ind[cols_to_use], on='month', how='left')
+                if "month" in df_ind.columns:
+                    df_ind["month"] = pd.to_datetime(df_ind["month"])
+                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
+                        "month"
+                    ]
+                    df = pd.merge(df, df_ind[cols_to_use], on="month", how="left")
+                elif "date" in df_ind.columns:
+                    df_ind["month"] = pd.to_datetime(df_ind["date"])
+                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
+                        "month"
+                    ]
+                    df = pd.merge(df, df_ind[cols_to_use], on="month", how="left")
             except Exception as e:
                 logger.warning(f"Skipped indicator {os.path.basename(csv_path)}: {e}")
-                
+
     # 4. Standardize format for ML Pipeline
     df.set_index("month", inplace=True)
     df.index.name = "date"
-    
+
     # 5. Extract fully numeric feature matrix
-    numeric_df = df.select_dtypes(include=['number'])
-    
-    # Safely interpolate missing values across mismatched indicator date ranges 
+    numeric_df = df.select_dtypes(include=["number"])
+
+    # Safely interpolate missing values across mismatched indicator date ranges
     # to protect SARIMAX strict constraint against NaN
     numeric_df = numeric_df.ffill().bfill()
-    numeric_df = numeric_df.dropna(axis=1, how='all')
+    numeric_df = numeric_df.dropna(axis=1, how="all")
 
     if "price" not in numeric_df.columns:
         raise Exception("Failed to identify 'price' column in merged dataset.")
 
     return numeric_df
 
+
 # -------------------------------------------------------
 # TRAIN MODEL
 # -------------------------------------------------------
+
 
 @app.post("/train/")
 def train_model():
@@ -279,12 +296,13 @@ def train_model():
         # Initialize and Train model
         model = FuelSARIMAXModel()
         logger.info(f"Training model initiated with shape {df.shape}")
-        
+
         # Suppress possible statsmodels warnings temporarily for clean logs
         import warnings
         from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
         with warnings.catch_warnings():
-            warnings.simplefilter('ignore', ConvergenceWarning)
+            warnings.simplefilter("ignore", ConvergenceWarning)
             model.train_sarimax(df)
 
         logger.info("Model training completed successfully")
@@ -301,6 +319,7 @@ def train_model():
 # -------------------------------------------------------
 # MODEL METRICS
 # -------------------------------------------------------
+
 
 @app.get("/metrics/")
 def get_metrics():
@@ -319,6 +338,7 @@ def get_metrics():
 # PREDICT FUTURE PRICES
 # -------------------------------------------------------
 
+
 @app.post("/predict/")
 def predict_price(steps: int = Form(...), cap: float = Form(None)):
     """
@@ -327,19 +347,22 @@ def predict_price(steps: int = Form(...), cap: float = Form(None)):
     """
     try:
         from datetime import datetime
+
         df = get_training_data()
-        
+
         # Calculate how many months gap is between the last historical data and current time
         last_date = df.index[-1]
         now = datetime.now()
         current_month_start = datetime(now.year, now.month, 1)
 
         # Gap calculation (months)
-        gap_steps = (current_month_start.year - last_date.year) * 12 + (current_month_start.month - last_date.month)
-        
+        gap_steps = (current_month_start.year - last_date.year) * 12 + (
+            current_month_start.month - last_date.month
+        )
+
         # We need to predict both the gap AND the user's requested future steps
         total_steps = max(steps, gap_steps + steps)
-        
+
         # Prepare future exogenous variables (cycling through history if needed)
         # SARIMAX needs exactly total_steps exog points
         historic_exog = df.drop(columns=["price"])
@@ -348,20 +371,22 @@ def predict_price(steps: int = Form(...), cap: float = Form(None)):
         else:
             # Repeat history if needed for long gaps
             repeats = (total_steps // len(historic_exog)) + 1
-            active_exog = pd.concat([historic_exog] * repeats).iloc[-total_steps:].copy()
+            active_exog = (
+                pd.concat([historic_exog] * repeats).iloc[-total_steps:].copy()
+            )
 
         model = FuelSARIMAXModel()
         # Predict all steps (gap + future)
         forecast_result = model.predict(steps=total_steps, future_exog=active_exog)
 
-        predicted_full  = forecast_result["predicted_mean"]
-        lower_full      = forecast_result["lower_ci"]
-        upper_full      = forecast_result["upper_ci"]
-        
+        predicted_full = forecast_result["predicted_mean"]
+        lower_full = forecast_result["lower_ci"]
+        upper_full = forecast_result["upper_ci"]
+
         # Slice to only include the specific future horizon requested by user (from NOW onwards)
         predicted = predicted_full.iloc[-steps:]
-        lower_ci  = lower_full.iloc[-steps:]
-        upper_ci  = upper_full.iloc[-steps:]
+        lower_ci = lower_full.iloc[-steps:]
+        upper_ci = upper_full.iloc[-steps:]
 
         # Apply regulatory cap if provided
         if cap is not None:
@@ -374,15 +399,17 @@ def predict_price(steps: int = Form(...), cap: float = Form(None)):
             upper_ci = upper_ci.tolist()
 
         # Generate real future date labels starting from NOW
-        future_dates = pd.date_range(start=current_month_start, periods=steps, freq="MS")
+        future_dates = pd.date_range(
+            start=current_month_start, periods=steps, freq="MS"
+        )
         date_labels = [d.strftime("%b %Y") for d in future_dates]
 
         return {
             "forecast_steps": steps,
             "predicted_prices": predicted,
-            "lower_ci":         lower_ci,
-            "upper_ci":         upper_ci,
-            "date_labels":      date_labels,
+            "lower_ci": lower_ci,
+            "upper_ci": upper_ci,
+            "date_labels": date_labels,
         }
 
     except Exception as e:
@@ -393,6 +420,7 @@ def predict_price(steps: int = Form(...), cap: float = Form(None)):
 # -------------------------------------------------------
 # ADMIN DASHBOARD (Protected with HTTP Basic Auth)
 # -------------------------------------------------------
+
 
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security_basic)):
     """Simple HTTP Basic Auth for admin access using environment variables."""
@@ -421,17 +449,14 @@ def admin_dashboard(request: Request, username: str = Depends(verify_admin)):
 
     logger.info(f"Admin dashboard accessed by: {username}")
     return templates.TemplateResponse(
-        "admin.html",
-        {
-            "request": request,
-            "files": files
-        }
+        request=request, name="admin.html", context={"request": request, "files": files}
     )
 
 
 # -------------------------------------------------------
 # PURGE UPLOADED FILE (Admin-protected)
 # -------------------------------------------------------
+
 
 @app.post("/admin/purge/{filename}")
 def purge_file(
@@ -461,19 +486,17 @@ def purge_file(
 # HEALTH CHECK
 # -------------------------------------------------------
 
+
 @app.get("/health")
 def health_check():
     """System health check endpoint."""
-    return {
-        "status": "healthy",
-        "service": "Fedora Fuel ML",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "Fedora Fuel ML", "version": "1.0.0"}
 
 
 # -------------------------------------------------------
 # PURGE ALL UPLOADED FILES (Admin-protected)
 # -------------------------------------------------------
+
 
 @app.post("/admin/purge_all")
 def purge_all_files(
@@ -487,7 +510,7 @@ def purge_all_files(
     files = list(UPLOAD_DIR.glob("*.csv"))
     for f in files:
         f.unlink()
-    
+
     # Also reset model trained status in a real scenario, but local_prices data still exists
     logger.info(f"Total {len(files)} uploaded files purged by admin: {username}")
     return RedirectResponse(url="/admin/", status_code=303)

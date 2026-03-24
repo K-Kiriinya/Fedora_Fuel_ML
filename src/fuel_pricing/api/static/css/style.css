@@ -99,6 +99,7 @@ body {
     transition: transform 0.2s;
     width: fit-content;
 }
+
 .theme-toggle:hover {
     transform: translateY(-2px);
 }
@@ -116,6 +117,7 @@ body {
     gap: 8px;
     box-shadow: 0 4px 6px var(--shadow);
 }
+
 .status-indicator {
     width: 10px;
     height: 10px;
@@ -123,10 +125,12 @@ body {
     background: var(--warning);
     box-shadow: 0 0 8px var(--warning);
 }
+
 .status-indicator.trained {
     background: var(--success);
     box-shadow: 0 0 8px var(--success);
 }
+
 .status-indicator.pulse {
     animation: pulse 2s infinite;
 }
