@@ -89,9 +89,10 @@
                         <button class="btn btn-primary" onclick="trainModel(this)">
                             🤖 Force Retrain Sequence
                         </button>
-                        <button class="btn btn-danger" onclick="clearData()">
-                            💥 Purge Data
-                        </button>
+                        <form method="POST" action="/admin/purge_all" style="width: 100%;"
+                              onsubmit="return confirm('CRITICAL: Purge ALL uploaded databanks permanently? System will reset to default clean sets.')">
+                            <button type="submit" class="btn btn-danger">💥 Purge All Local Data</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -271,7 +272,7 @@
             const style = getComputedStyle(document.body);
             const textColor = style.getPropertyValue('--text-primary').trim() || '#1e293b';
             const gridColor = style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)';
-            const accentColor = style.getPropertyValue('--accent').trim() || '#6366f1';
+            const accentColor = style.getPropertyValue('--accent').trim() || '#0ea5e9';
 
             const gradient = ctx.createLinearGradient(0, 0, 0, 400);
             const r = parseInt(accentColor.slice(1,3), 16) || 99;
@@ -317,6 +318,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            loadAdminMetrics();
             const cachedPred = localStorage.getItem('latest_prediction');
             if (cachedPred) {
                 try {

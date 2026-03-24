@@ -28,6 +28,7 @@ import os
 from fuel_pricing.ml.sarimax_model import FuelSARIMAXModel
 from fuel_pricing.data.loader import load_and_prepare
 from fuel_pricing.pipelines.predict_pipeline import run_prediction
+from fuel_pricing.optimization.pricing import apply_cap
 from fuel_pricing.core.config import UPLOAD_DIR, PROCESSED_DIR
 from fuel_pricing.api.auth import (
     authenticate_user,
@@ -83,9 +84,8 @@ def home(request: Request):
     Render homepage.
     """
     return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={"request": request}
+        "index.html",
+        {"request": request}
     )
 
 
@@ -320,34 +320,69 @@ def get_metrics():
 # -------------------------------------------------------
 
 @app.post("/predict/")
-def predict_price(steps: int = Form(...)):
+def predict_price(steps: int = Form(...), cap: float = Form(None)):
     """
-    Predict future fuel prices with confidence intervals and real date labels.
+    Predict future fuel prices with confidence intervals and optional regulatory cap.
+    Forecasts start from the current month.
     """
     try:
+        from datetime import datetime
         df = get_training_data()
+        
+        # Calculate how many months gap is between the last historical data and current time
+        last_date = df.index[-1]
+        now = datetime.now()
+        current_month_start = datetime(now.year, now.month, 1)
 
-        # Use last known exogenous values for forecasting forward
-        future_exog = df.drop(columns=["price"]).iloc[-steps:].copy()
+        # Gap calculation (months)
+        gap_steps = (current_month_start.year - last_date.year) * 12 + (current_month_start.month - last_date.month)
+        
+        # We need to predict both the gap AND the user's requested future steps
+        total_steps = max(steps, gap_steps + steps)
+        
+        # Prepare future exogenous variables (cycling through history if needed)
+        # SARIMAX needs exactly total_steps exog points
+        historic_exog = df.drop(columns=["price"])
+        if total_steps <= len(historic_exog):
+            active_exog = historic_exog.iloc[-total_steps:].copy()
+        else:
+            # Repeat history if needed for long gaps
+            repeats = (total_steps // len(historic_exog)) + 1
+            active_exog = pd.concat([historic_exog] * repeats).iloc[-total_steps:].copy()
 
         model = FuelSARIMAXModel()
-        forecast_result = model.predict(steps=steps, future_exog=future_exog)
+        # Predict all steps (gap + future)
+        forecast_result = model.predict(steps=total_steps, future_exog=active_exog)
 
-        predicted  = forecast_result["predicted_mean"]
-        lower_ci   = forecast_result["lower_ci"]
-        upper_ci   = forecast_result["upper_ci"]
+        predicted_full  = forecast_result["predicted_mean"]
+        lower_full      = forecast_result["lower_ci"]
+        upper_full      = forecast_result["upper_ci"]
+        
+        # Slice to only include the specific future horizon requested by user (from NOW onwards)
+        predicted = predicted_full.iloc[-steps:]
+        lower_ci  = lower_full.iloc[-steps:]
+        upper_ci  = upper_full.iloc[-steps:]
 
-        # Generate real future date labels from the training data's last date
-        last_date = df.index[-1]
-        future_dates = pd.date_range(start=last_date, periods=steps + 1, freq="MS")[1:]
+        # Apply regulatory cap if provided
+        if cap is not None:
+            predicted = [apply_cap(p, cap) for p in predicted]
+            lower_ci = [apply_cap(p, cap) for p in lower_ci]
+            upper_ci = [apply_cap(p, cap) for p in upper_ci]
+        else:
+            predicted = predicted.tolist()
+            lower_ci = lower_ci.tolist()
+            upper_ci = upper_ci.tolist()
+
+        # Generate real future date labels starting from NOW
+        future_dates = pd.date_range(start=current_month_start, periods=steps, freq="MS")
         date_labels = [d.strftime("%b %Y") for d in future_dates]
 
         return {
             "forecast_steps": steps,
-            "predicted_prices": predicted.tolist(),
-            "lower_ci":         lower_ci.tolist(),
-            "upper_ci":         upper_ci.tolist(),
-            "date_labels":      date_labels.tolist(),
+            "predicted_prices": predicted,
+            "lower_ci":         lower_ci,
+            "upper_ci":         upper_ci,
+            "date_labels":      date_labels,
         }
 
     except Exception as e:
@@ -360,9 +395,12 @@ def predict_price(steps: int = Form(...)):
 # -------------------------------------------------------
 
 def verify_admin(credentials: HTTPBasicCredentials = Depends(security_basic)):
-    """Simple HTTP Basic Auth for admin access."""
-    correct_username = secrets.compare_digest(credentials.username, "admin")
-    correct_password = secrets.compare_digest(credentials.password, "admin123")
+    """Simple HTTP Basic Auth for admin access using environment variables."""
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+    correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
 
     if not (correct_username and correct_password):
         raise HTTPException(
@@ -383,9 +421,8 @@ def admin_dashboard(request: Request, username: str = Depends(verify_admin)):
 
     logger.info(f"Admin dashboard accessed by: {username}")
     return templates.TemplateResponse(
-        request=request,
-        name="admin.html",
-        context={
+        "admin.html",
+        {
             "request": request,
             "files": files
         }
@@ -432,3 +469,25 @@ def health_check():
         "service": "Fedora Fuel ML",
         "version": "1.0.0"
     }
+
+
+# -------------------------------------------------------
+# PURGE ALL UPLOADED FILES (Admin-protected)
+# -------------------------------------------------------
+
+@app.post("/admin/purge_all")
+def purge_all_files(
+    request: Request,
+    username: str = Depends(verify_admin),
+):
+    """
+    Delete ALL uploaded CSV files.
+    Protected by HTTP Basic Auth.
+    """
+    files = list(UPLOAD_DIR.glob("*.csv"))
+    for f in files:
+        f.unlink()
+    
+    # Also reset model trained status in a real scenario, but local_prices data still exists
+    logger.info(f"Total {len(files)} uploaded files purged by admin: {username}")
+    return RedirectResponse(url="/admin/", status_code=303)

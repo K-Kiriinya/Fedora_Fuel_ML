@@ -1,37 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --text-primary: #1e293b;
-    --text-secondary: #475569;
-    --card-bg: rgba(255, 255, 255, 0.7);
-    --card-border: rgba(255, 255, 255, 0.5);
-    --accent: #6366f1;
-    --accent-hover: #4f46e5;
-    --input-bg: rgba(255, 255, 255, 0.8);
-    --input-border: rgba(99, 102, 241, 0.3);
-    --shadow: rgba(0, 0, 0, 0.08);
-    --mesh-bg: linear-gradient(-45deg, #e0e7ff, #c7d2fe, #fbcfe8, #ede9fe);
+    --text-primary: #0f172a;
+    --text-secondary: #4b5563;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --card-border: rgba(0, 0, 0, 0.08);
+    --accent: #0ea5e9;
+    --accent-hover: #0284c7;
+    --input-bg: rgba(249, 250, 251, 0.9);
+    --input-border: rgba(14, 165, 233, 0.3);
+    --shadow: rgba(0, 0, 0, 0.06);
+    --mesh-bg: linear-gradient(-45deg, #ffffff, #f1f5f9, #e2e8f0, #f8fafc);
     --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.15);
+    --success-bg: rgba(16, 185, 129, 0.1);
     --warning: #f59e0b;
     --danger: #ef4444;
-    --danger-bg: rgba(239, 68, 68, 0.15);
-    --chart-grid: rgba(0, 0, 0, 0.05);
+    --danger-bg: rgba(239, 68, 68, 0.1);
+    --chart-grid: rgba(0, 0, 0, 0.04);
 }
 
 [data-theme='dark'] {
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --card-bg: rgba(15, 23, 42, 0.65);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --accent: #818cf8;
-    --accent-hover: #6366f1;
+    --card-bg: rgba(15, 23, 42, 0.75);
+    --card-border: rgba(255, 255, 255, 0.06);
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
     --input-bg: rgba(30, 41, 59, 0.8);
-    --input-border: rgba(129, 140, 248, 0.3);
-    --shadow: rgba(0, 0, 0, 0.4);
-    --mesh-bg: linear-gradient(-45deg, #0f172a, #164e63, #312e81, #020617);
+    --input-border: rgba(56, 189, 248, 0.3);
+    --shadow: rgba(0, 0, 0, 0.3);
+    --mesh-bg: linear-gradient(-45deg, #020617, #0f172a, #1e293b, #000000);
     --success: #34d399;
-    --success-bg: rgba(52, 211, 153, 0.15);
+    --success-bg: rgba(52, 211, 153, 0.1);
     --chart-grid: rgba(255, 255, 255, 0.05);
 }
 
@@ -39,7 +39,10 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    transition: background-color 0.4s ease, border-color 0.4s ease;
+}
+
+body, .card, .stat-box, .stat-badge, .theme-toggle, .btn, button, input, .info-item, .forecast-table tr td {
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 body {
@@ -246,7 +249,7 @@ button {
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+    box-shadow: 0 4px 14px 0 rgba(14, 165, 233, 0.3);
     transition: all 0.2s ease;
     display: flex;
     justify-content: center;
@@ -256,7 +259,7 @@ button {
 button:hover:not(:disabled) {
     background: var(--accent-hover);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.23);
+    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.23);
 }
 button:active:not(:disabled) {
     transform: translateY(0);
@@ -581,8 +584,8 @@ details.data-requirements .req-content {
     animation: slideUp 0.4s ease;
 }
 .metric-card {
-    background: rgba(99, 102, 241, 0.08);
-    border: 1px solid rgba(99, 102, 241, 0.25);
+    background: rgba(14, 165, 233, 0.06);
+    border: 1px solid rgba(14, 165, 233, 0.2);
     border-radius: 10px;
     padding: 10px 8px;
     text-align: center;
@@ -591,8 +594,8 @@ details.data-requirements .req-content {
     gap: 3px;
 }
 [data-theme='dark'] .metric-card {
-    background: rgba(129, 140, 248, 0.1);
-    border-color: rgba(129, 140, 248, 0.25);
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.2);
 }
 .metric-label {
     font-size: 0.65em;
@@ -643,10 +646,10 @@ details.data-requirements .req-content {
 }
 .forecast-table tbody tr:last-child td { border-bottom: none; }
 .forecast-table tbody tr:hover td {
-    background: rgba(99, 102, 241, 0.04);
+    background: rgba(14, 165, 233, 0.04);
 }
 [data-theme='dark'] .forecast-table tbody tr:hover td {
-    background: rgba(129, 140, 248, 0.06);
+    background: rgba(56, 189, 248, 0.06);
 }
 .ci-range {
     color: var(--text-secondary);

@@ -23,12 +23,9 @@ from pathlib import Path
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 
-# -------------------
-# MODEL STORAGE PATH
-# -------------------
-
-MODEL_PATH = Path("data/processed/sarimax_model.pkl")
-METRICS_PATH = Path("data/processed/metrics.pkl")
+from fuel_pricing.core.config import PROCESSED_DIR
+MODEL_PATH = PROCESSED_DIR / "sarimax_model.pkl"
+METRICS_PATH = PROCESSED_DIR / "metrics.pkl"
 
 
 class FuelSARIMAXModel:
