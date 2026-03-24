@@ -514,3 +514,57 @@ def purge_all_files(
     # Also reset model trained status in a real scenario, but local_prices data still exists
     logger.info(f"Total {len(files)} uploaded files purged by admin: {username}")
     return RedirectResponse(url="/admin/", status_code=303)
+
+
+# -------------------------------------------------------
+# HISTORY DATA
+# -------------------------------------------------------
+
+
+@app.get("/history/")
+def get_history_data():
+    """
+    Returns historical price data for Petrol (PMS), Diesel (AGO), and Kerosene (Kero).
+    """
+    try:
+        prices_file = (
+            PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+        )
+        if not prices_file.exists():
+            return {"error": "Historical data file not found."}
+
+        df = pd.read_csv(prices_file)
+
+        # Standardize time column
+        if "month" in df.columns:
+            df["month"] = pd.to_datetime(df["month"])
+        elif "date" in df.columns:
+            df["month"] = pd.to_datetime(df["date"])
+        else:
+            return {"error": "Time column not found in dataset."}
+
+        df.sort_values("month", inplace=True)
+
+        # Prepare labels and values
+        labels = [d.strftime("%b %Y") for d in df["month"]]
+
+        # Clean NaN values for JSON safety
+        pms_values = (
+            df["PMS"].ffill().bfill().round(2).tolist() if "PMS" in df.columns else []
+        )
+        ago_values = (
+            df["AGO"].ffill().bfill().round(2).tolist() if "AGO" in df.columns else []
+        )
+        kero_values = (
+            df["Kero"].ffill().bfill().round(2).tolist() if "Kero" in df.columns else []
+        )
+
+        return {
+            "labels": labels,
+            "pms": pms_values,
+            "ago": ago_values,
+            "kero": kero_values,
+        }
+    except Exception as e:
+        logger.error(f"History data error: {str(e)}")
+        return {"error": str(e)}
