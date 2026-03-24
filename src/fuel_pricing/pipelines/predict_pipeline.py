@@ -41,8 +41,8 @@ def run_prediction(df: pd.DataFrame, steps: int = 1):
 
     Returns
     -------
-    float or list
-        Predicted price(s)
+    list
+        Predicted prices
     """
 
     if "price" not in df.columns:
@@ -58,9 +58,7 @@ def run_prediction(df: pd.DataFrame, steps: int = 1):
 
     model = FuelSARIMAXModel()
 
-    forecast = model.predict(
-        steps=steps,
-        future_exog=future_exog
-    )
+    # model.predict() now returns a dict; extract predicted_mean
+    forecast_result = model.predict(steps=steps, future_exog=future_exog)
 
-    return forecast.tolist()
+    return forecast_result["predicted_mean"].tolist()

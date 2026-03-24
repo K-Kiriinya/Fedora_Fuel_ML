@@ -1,4 +1,4 @@
-# 🛢️ Fedora Fuel ML — Dynamic SARIMAX Pricing Model
+# 🛢️ Fuel ML — Dynamic SARIMAX Pricing Model
 
 > A production-ready machine learning system for forecasting Kenyan fuel prices (KES) using **SARIMAX** time series modeling with multi-variate exogenous variables, a Glassmorphism web dashboard, and automated data pipeline compilation.
 
@@ -40,6 +40,7 @@
 Fedora Fuel ML is a full-stack ML application that ingests processed historical datasets, trains a seasonal time-series model, and serves interactive price forecasts via a modern browser-based dashboard. The engine is built on FastAPI and operates as a containerized microservice via Docker.
 
 **Data Flow:**
+
 ```
 data/processed/ (CSVs) ──► get_training_data() ──► FuelSARIMAXModel ──► /predict/ ──► Chart.js UI
         │                                                                              │
@@ -52,37 +53,38 @@ On first page load the system **automatically** merges all processed CSVs, train
 
 ## ✨ Key Features
 
-| Feature | Description |
-|---|---|
-| 🔄 **Zero-Touch Inference** | Auto-trains on startup using processed datasets; chart renders before any button is clicked |
-| 🧬 **Dynamic Multi-variate Syncing** | Loops over all 8 CSVs in `market_indicators/`, outer-joins them on date, applies `ffill()/bfill()` for gap-safe SARIMAX training |
-| 📊 **Glassmorphism Dashboard** | Frosted-glass UI with dark/light mode toggle, skeleton loaders, animated micro-interactions, and `localStorage` caching of predictions |
-| 🛡️ **Enterprise Security** | JWT authentication, bcrypt password hashing, HTTP Basic Auth admin, file-type validation, path-traversal prevention, 10 MB upload cap |
-| 💻 **Admin Console** | Protected real-time status panel showing uploads, model config, training metrics, and quick retrain action |
-| 📈 **Persistent Chart State** | Prediction graphs persist across page reloads via `localStorage`; cache is invalidated only on model retrain |
-| 🐳 **Docker Deployment** | Multi-stage Dockerfile + `docker-compose.yml` for one-command production launch |
+| Feature                              | Description                                                                                                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔄 **Zero-Touch Inference**          | Auto-trains on startup using processed datasets; chart renders before any button is clicked                                            |
+| 🧬 **Dynamic Multi-variate Syncing** | Loops over all 8 CSVs in `market_indicators/`, outer-joins them on date, applies `ffill()/bfill()` for gap-safe SARIMAX training       |
+| 📊 **Glassmorphism Dashboard**       | Frosted-glass UI with dark/light mode toggle, skeleton loaders, animated micro-interactions, and `localStorage` caching of predictions |
+| 🛡️ **Enterprise Security**           | JWT authentication, bcrypt password hashing, HTTP Basic Auth admin, file-type validation, path-traversal prevention, 10 MB upload cap  |
+| 💻 **Admin Console**                 | Protected real-time status panel showing uploads, model config, training metrics, and quick retrain action                             |
+| 📈 **Persistent Chart State**        | Prediction graphs persist across page reloads via `localStorage`; cache is invalidated only on model retrain                           |
+| 🐳 **Docker Deployment**             | Multi-stage Dockerfile + `docker-compose.yml` for one-command production launch                                                        |
 
 ---
 
 ## 📊 Project Scorecard
 
-| Aspect | Status | Score |
-|---|---|---|
-| Code Quality | ✅ Excellent | 10/10 |
-| Functionality | ✅ All working | 10/10 |
-| Security | ✅ Enterprise-grade | 9/10 |
-| Documentation | ✅ Comprehensive | 10/10 |
-| Model Accuracy | ✅ MAPE 2.25% | 10/10 |
-| UI/UX | ✅ Professional | 10/10 |
-| Test Coverage | ⚠️ Manual tests only | 2/10 |
-| Production Ready | ✅ Yes | 9/10 |
-| **Overall** | **A-** | **93%** |
+| Aspect           | Status               | Score   |
+| ---------------- | -------------------- | ------- |
+| Code Quality     | ✅ Excellent         | 10/10   |
+| Functionality    | ✅ All working       | 10/10   |
+| Security         | ✅ Enterprise-grade  | 9/10    |
+| Documentation    | ✅ Comprehensive     | 10/10   |
+| Model Accuracy   | ✅ MAPE 2.25%        | 10/10   |
+| UI/UX            | ✅ Professional      | 10/10   |
+| Test Coverage    | ⚠️ Manual tests only | 2/10    |
+| Production Ready | ✅ Yes               | 9/10    |
+| **Overall**      | **A-**               | **93%** |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - pip
 
@@ -108,12 +110,12 @@ uvicorn fuel_pricing.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### Access Points
 
-| URL | Description |
-|---|---|
-| http://127.0.0.1:8000 | Main prediction dashboard |
+| URL                          | Description                      |
+| ---------------------------- | -------------------------------- |
+| http://127.0.0.1:8000        | Main prediction dashboard        |
 | http://127.0.0.1:8000/admin/ | Admin console (admin / admin123) |
-| http://127.0.0.1:8000/docs | Swagger API docs |
-| http://127.0.0.1:8000/health | Health check |
+| http://127.0.0.1:8000/docs   | Swagger API docs                 |
+| http://127.0.0.1:8000/health | Health check                     |
 
 ---
 
@@ -131,6 +133,7 @@ sudo docker-compose down
 ```
 
 The `docker-compose.yml` spins up:
+
 - **fedora-fuel-api** — FastAPI app on port 8000
 - **fedora-fuel-redis** — Redis instance (ready for future caching)
 
@@ -139,7 +142,9 @@ The `docker-compose.yml` spins up:
 ## 🗺️ Interface Walkthrough
 
 ### Automatic Default Mode
+
 When you open the dashboard with no cached data, the system:
+
 1. Calls `POST /train/` using all data in `data/processed/`
 2. Calls `POST /predict/` with `steps=6`
 3. Renders the 6-month forecast chart automatically
@@ -147,12 +152,15 @@ When you open the dashboard with no cached data, the system:
 The chart remains visible on reload until the model is retrained.
 
 ### Manual Override Mode
+
 1. **Step 1 — Ingest Data**: Upload a custom `.csv` file to override default processed data
 2. **Step 2 — Execute Training Sequence**: Retrain the model; clears the cached chart
 3. **Step 3 — Forecast**: Choose forecast horizon (1–24 months) and generate predictions
 
 ### Admin Console
+
 Navigate to `/admin/` (credentials: `admin` / `admin123`). From here you can:
+
 - View all uploaded files and their sizes
 - See current model configuration and evaluation metrics
 - Trigger model retraining
@@ -164,21 +172,21 @@ Navigate to `/admin/` (credentials: `admin` / `admin123`). From here you can:
 
 ### Required Columns (for custom uploads)
 
-| Column | Type | Required | Description |
-|---|---|---|---|
-| `date` | datetime | ✅ Yes | Format: `YYYY-MM-DD` |
-| `price` | float | ✅ Yes | Fuel price in KES |
+| Column  | Type     | Required | Description          |
+| ------- | -------- | -------- | -------------------- |
+| `date`  | datetime | ✅ Yes   | Format: `YYYY-MM-DD` |
+| `price` | float    | ✅ Yes   | Fuel price in KES    |
 
 ### Optional Exogenous Variables
 
-| Column | Type | Description |
-|---|---|---|
-| `crude_price` | float | Global crude oil price (USD/barrel) |
-| `exchange_rate` | float | USD/KES exchange rate |
-| `inflation` | float | Monthly inflation rate (%) |
-| `pipeline_burst` | int | Binary: 1 = pipeline disruption |
-| `fuel_shortage` | int | Binary: 1 = shortage event |
-| `transport_cost_index` | float | Transport cost metric |
+| Column                 | Type  | Description                         |
+| ---------------------- | ----- | ----------------------------------- |
+| `crude_price`          | float | Global crude oil price (USD/barrel) |
+| `exchange_rate`        | float | USD/KES exchange rate               |
+| `inflation`            | float | Monthly inflation rate (%)          |
+| `pipeline_burst`       | int   | Binary: 1 = pipeline disruption     |
+| `fuel_shortage`        | int   | Binary: 1 = shortage event          |
+| `transport_cost_index` | float | Transport cost metric               |
 
 ### Example Custom CSV
 
@@ -221,16 +229,16 @@ Your browser will prompt for credentials when navigating to `/admin/`.
 
 ## 📡 REST API Reference
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/` | None | Renders main prediction dashboard |
-| POST | `/upload/` | None | Uploads CSV (10 MB max, CSV only) |
-| POST | `/train/` | JWT | Compiles datasets, trains SARIMAX, saves model |
-| POST | `/predict/` | None | Generates forecast (`steps` form field) |
-| GET | `/admin/` | HTTP Basic | Admin monitoring console |
-| POST | `/api/login` | None | Returns JWT bearer token |
-| GET | `/health` | None | Returns service status and version |
-| GET | `/docs` | None | Swagger / OpenAPI documentation |
+| Method | Endpoint     | Auth       | Description                                    |
+| ------ | ------------ | ---------- | ---------------------------------------------- |
+| GET    | `/`          | None       | Renders main prediction dashboard              |
+| POST   | `/upload/`   | None       | Uploads CSV (10 MB max, CSV only)              |
+| POST   | `/train/`    | JWT        | Compiles datasets, trains SARIMAX, saves model |
+| POST   | `/predict/`  | None       | Generates forecast (`steps` form field)        |
+| GET    | `/admin/`    | HTTP Basic | Admin monitoring console                       |
+| POST   | `/api/login` | None       | Returns JWT bearer token                       |
+| GET    | `/health`    | None       | Returns service status and version             |
+| GET    | `/docs`      | None       | Swagger / OpenAPI documentation                |
 
 ### cURL Examples
 
@@ -285,24 +293,24 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/fuel_db
 
 ### SARIMAX Configuration
 
-| Parameter | Value |
-|---|---|
-| Non-seasonal order (p, d, q) | (1, 1, 1) |
-| Seasonal order (P, D, Q, s) | (1, 1, 1, 12) |
-| Seasonality period | 12 months |
-| Train/test split | 80% / 20% |
-| Evaluation metrics | MAE, RMSE, MAPE |
-| Model persistence | joblib (`.pkl`) |
+| Parameter                    | Value           |
+| ---------------------------- | --------------- |
+| Non-seasonal order (p, d, q) | (1, 1, 1)       |
+| Seasonal order (P, D, Q, s)  | (1, 1, 1, 12)   |
+| Seasonality period           | 12 months       |
+| Train/test split             | 80% / 20%       |
+| Evaluation metrics           | MAE, RMSE, MAPE |
+| Model persistence            | joblib (`.pkl`) |
 
 ### Feature Engineering
 
 The model automatically derives 3 additional features:
 
-| Feature | Formula |
-|---|---|
-| `burst_fx_interaction` | `pipeline_burst × exchange_rate` |
+| Feature                          | Formula                          |
+| -------------------------------- | -------------------------------- |
+| `burst_fx_interaction`           | `pipeline_burst × exchange_rate` |
 | `shortage_inflation_interaction` | `fuel_shortage × inflation_rate` |
-| `log_transport_cost` | `log(transport_cost_index)` |
+| `log_transport_cost`             | `log(transport_cost_index)`      |
 
 ### Dynamic Data Loading (`get_training_data()`)
 
@@ -319,13 +327,13 @@ The model automatically derives 3 additional features:
 
 ### Model vs Alternatives
 
-| Model | Typical MAPE | Our Result |
-|---|---|---|
-| **SARIMAX** ← used | 3–8% | **2.25% ✅** |
-| Prophet | 5–10% | — |
-| LSTM | 4–12% | — |
-| Linear Regression | 8–15% | — |
-| Simple Moving Average | 10–20% | — |
+| Model                 | Typical MAPE | Our Result   |
+| --------------------- | ------------ | ------------ |
+| **SARIMAX** ← used    | 3–8%         | **2.25% ✅** |
+| Prophet               | 5–10%        | —            |
+| LSTM                  | 4–12%        | —            |
+| Linear Regression     | 8–15%        | —            |
+| Simple Moving Average | 10–20%       | —            |
 
 ---
 
@@ -335,33 +343,33 @@ The model automatically derives 3 additional features:
 
 ### Performance Metrics
 
-| Metric | Value | Rating | Meaning |
-|---|---|---|---|
-| MAE | **4.55 KES** | ⭐⭐⭐⭐⭐ | Average prediction off by ±4.55 KES |
-| RMSE | **6.04 KES** | ⭐⭐⭐⭐⭐ | Low error variance, few outliers |
-| MAPE | **2.25%** | ⭐⭐⭐⭐⭐ | 97.75% average accuracy |
+| Metric | Value        | Rating     | Meaning                             |
+| ------ | ------------ | ---------- | ----------------------------------- |
+| MAE    | **4.55 KES** | ⭐⭐⭐⭐⭐ | Average prediction off by ±4.55 KES |
+| RMSE   | **6.04 KES** | ⭐⭐⭐⭐⭐ | Low error variance, few outliers    |
+| MAPE   | **2.25%**    | ⭐⭐⭐⭐⭐ | 97.75% average accuracy             |
 
 Industry standard for "Excellent" is MAPE < 5%. This model achieves **2.25%** — significantly exceeding the benchmark.
 
 ### Sample 6-Month Forecast (Validation Run)
 
-| Month | Predicted (KES) | Change | Trend |
-|---|---|---|---|
-| Month 1 | 191.18 | Baseline | — |
-| Month 2 | 194.38 | +3.20 (+1.7%) | ↗️ Rising |
-| Month 3 | 199.87 | +5.49 (+2.8%) | ↗️ Rising |
-| Month 4 | 204.31 | +4.44 (+2.2%) | ↗️ Rising |
-| Month 5 | 210.69 | +6.38 (+3.1%) | ↗️ Rising |
-| Month 6 | 216.29 | +5.60 (+2.7%) | ↗️ Rising |
+| Month   | Predicted (KES) | Change        | Trend     |
+| ------- | --------------- | ------------- | --------- |
+| Month 1 | 191.18          | Baseline      | —         |
+| Month 2 | 194.38          | +3.20 (+1.7%) | ↗️ Rising |
+| Month 3 | 199.87          | +5.49 (+2.8%) | ↗️ Rising |
+| Month 4 | 204.31          | +4.44 (+2.2%) | ↗️ Rising |
+| Month 5 | 210.69          | +6.38 (+3.1%) | ↗️ Rising |
+| Month 6 | 216.29          | +5.60 (+2.7%) | ↗️ Rising |
 
 **Forecast Range**: KES 191.18 – 216.29 (+13.1% over 6 months)
 
 ### Test Scenarios
 
-| Scenario | Dataset Size | MAPE | Recommendation |
-|---|---|---|---|
-| Full dataset | 30 months | **2.25% ✅** | Use in production |
-| Minimal dataset | 15 months | 53.74% ❌ | Not recommended |
+| Scenario        | Dataset Size | MAPE         | Recommendation    |
+| --------------- | ------------ | ------------ | ----------------- |
+| Full dataset    | 30 months    | **2.25% ✅** | Use in production |
+| Minimal dataset | 15 months    | 53.74% ❌    | Not recommended   |
 
 ### Optimal Usage Guidelines
 
@@ -377,29 +385,33 @@ Industry standard for "Excellent" is MAPE < 5%. This model achieves **2.25%** �
 The repository includes **11 cleaned historical datasets** covering 2010–2024:
 
 ### `data/processed/local_prices/`
-| File | Description |
-|---|---|
+
+| File                                  | Description                             |
+| ------------------------------------- | --------------------------------------- |
 | `kenyan_oil_prices_monthly_clean.csv` | Primary target: Monthly KES fuel prices |
 
 ### `data/processed/market_indicators/`
-| File | Description |
-|---|---|
-| `cpi_monthly_clean.csv` | Consumer Price Index (monthly) |
-| `crude_oil_price_clean.csv` | Global crude oil prices (USD/barrel) |
-| `current_exchange_rate_clean.csv` | Current USD/KES exchange rate |
-| `historical_exchange_rate_clean.csv` | Historical exchange rate series |
-| `historical_exchange_rate_monthly_mean_by_currency.csv` | Multi-currency monthly means |
-| `inflation_rates_monthly_clean.csv` | Monthly inflation rates |
-| `non_linear_market_shocks.csv` | Pipeline bursts, shortage events |
-| `usd_kes_monthly_mean.csv` | USD/KES smoothed monthly mean |
+
+| File                                                    | Description                          |
+| ------------------------------------------------------- | ------------------------------------ |
+| `cpi_monthly_clean.csv`                                 | Consumer Price Index (monthly)       |
+| `crude_oil_price_clean.csv`                             | Global crude oil prices (USD/barrel) |
+| `current_exchange_rate_clean.csv`                       | Current USD/KES exchange rate        |
+| `historical_exchange_rate_clean.csv`                    | Historical exchange rate series      |
+| `historical_exchange_rate_monthly_mean_by_currency.csv` | Multi-currency monthly means         |
+| `inflation_rates_monthly_clean.csv`                     | Monthly inflation rates              |
+| `non_linear_market_shocks.csv`                          | Pipeline bursts, shortage events     |
+| `usd_kes_monthly_mean.csv`                              | USD/KES smoothed monthly mean        |
 
 ### `data/processed/regulatory/`
-| File | Description |
-|---|---|
-| `epra_pump_prices_caps_clean_wide.csv` | EPRA price cap data (wide format) |
-| `epra_pump_prices_caps_tidy_long.csv` | EPRA price cap data (tidy long format) |
+
+| File                                   | Description                            |
+| -------------------------------------- | -------------------------------------- |
+| `epra_pump_prices_caps_clean_wide.csv` | EPRA price cap data (wide format)      |
+| `epra_pump_prices_caps_tidy_long.csv`  | EPRA price cap data (tidy long format) |
 
 ### `data/external/`
+
 - `sample_fuel_data.csv` — 30-month complete sample for testing
 
 ---
@@ -501,25 +513,31 @@ Fedora_Fuel_ML/
 ## 🔬 Component Analysis
 
 ### `main.py` — FastAPI Application
+
 - **Lines**: ~323 | **Status**: ✅ Fully functional
 - Hosts all 8 endpoints, Jinja2 template rendering, `get_training_data()` dynamic loader, structured logging, file upload security
 
 ### `auth.py` — Authentication Module
+
 - **Lines**: ~175 | **Status**: ✅ Fully functional
 - JWT token creation/validation, bcrypt password hashing, lazy initialization (avoids import-time AttributeError), 60-minute token expiration
 
 ### `sarimax_model.py` — ML Engine
+
 - **Lines**: ~263 | **Status**: ✅ Fully functional (metrics bug fixed)
 - SARIMAX (1,1,1)(1,1,1,12), feature engineering, 80/20 split, joblib persistence, forecast generation
 
 ### `loader.py` — Data Utility
+
 - **Lines**: ~26 | **Status**: ✅ Functional
 - CSV parse, date conversion, chronological sort, index setting
 
 ### `index.html` — Main Dashboard
+
 - Modern glassmorphism design, Chart.js forecast visualization, dark/light mode, localStorage prediction caching, skeleton loaders, auto-train on first load
 
 ### `admin.html` — Admin Console
+
 - System stats, uploaded files table, model configuration display, retrain button, HTTP Basic Auth protected
 
 ---
@@ -528,14 +546,14 @@ Fedora_Fuel_ML/
 
 ### Implemented Protections
 
-| Layer | Mechanism | Status |
-|---|---|---|
-| Authentication | JWT (60 min expiry) + HTTP Basic Auth | ✅ |
-| Password storage | bcrypt with salt | ✅ |
-| File upload | Extension (CSV only), size (10 MB), path traversal prevention, filename sanitization | ✅ |
-| Input validation | CSV structure, date format, required columns | ✅ |
-| Audit logging | Auth events, uploads, training, errors | ✅ |
-| Admin access | HTTP Basic Auth prompt | ✅ |
+| Layer            | Mechanism                                                                            | Status |
+| ---------------- | ------------------------------------------------------------------------------------ | ------ |
+| Authentication   | JWT (60 min expiry) + HTTP Basic Auth                                                | ✅     |
+| Password storage | bcrypt with salt                                                                     | ✅     |
+| File upload      | Extension (CSV only), size (10 MB), path traversal prevention, filename sanitization | ✅     |
+| Input validation | CSV structure, date format, required columns                                         | ✅     |
+| Audit logging    | Auth events, uploads, training, errors                                               | ✅     |
+| Admin access     | HTTP Basic Auth prompt                                                               | ✅     |
 
 **Security Score: 9/10**
 
@@ -579,21 +597,23 @@ Compatible with: **Heroku**, **Railway**, **Render**, **DigitalOcean App Platfor
 
 ## ⚡ Performance Characteristics
 
-| Metric | Value |
-|---|---|
-| Concurrent users | 1–100 |
-| Predictions per day | 1,000+ |
-| Model training time | 5–30 seconds |
-| Prediction latency | < 1 second |
-| Max upload size | 10 MB |
-| Max historical records | 100,000 |
+| Metric                 | Value        |
+| ---------------------- | ------------ |
+| Concurrent users       | 1–100        |
+| Predictions per day    | 1,000+       |
+| Model training time    | 5–30 seconds |
+| Prediction latency     | < 1 second   |
+| Max upload size        | 10 MB        |
+| Max historical records | 100,000      |
 
 ### Known Bottlenecks
+
 1. **Synchronous training** — blocks new requests during fit
 2. **Disk-based upload storage** — no cloud storage integration yet
 3. **No server-side caching** — predictions recalculated on each call (client-side `localStorage` caching mitigates this on the frontend)
 
 ### Optimization Opportunities
+
 - **Redis** for server-side prediction caching (5× speedup)
 - **Celery/RQ** for async non-blocking model training
 - **PostgreSQL** for metadata and prediction history
@@ -604,13 +624,15 @@ Compatible with: **Heroku**, **Railway**, **Render**, **DigitalOcean App Platfor
 ## 🛠️ Improvements & Changelog
 
 ### Critical Bug Fixes Applied
-| Bug | File | Fix |
-|---|---|---|
-| Metrics dict accessed before assignment | `sarimax_model.py:115–132` | Compute MAE/RMSE/MAPE first, then assign |
-| bcrypt hash at import time → AttributeError | `auth.py:136` | Lazy initialization on first auth request |
-| Unused import `from certifi import contents` | `main.py:12` | Removed |
+
+| Bug                                          | File                       | Fix                                       |
+| -------------------------------------------- | -------------------------- | ----------------------------------------- |
+| Metrics dict accessed before assignment      | `sarimax_model.py:115–132` | Compute MAE/RMSE/MAPE first, then assign  |
+| bcrypt hash at import time → AttributeError  | `auth.py:136`              | Lazy initialization on first auth request |
+| Unused import `from certifi import contents` | `main.py:12`               | Removed                                   |
 
 ### Major Features Added
+
 - ✅ Glassmorphism web UI with dark/light mode toggle (`index.html`)
 - ✅ Admin dashboard with system stats (`admin.html`)
 - ✅ JWT authentication system (`auth.py`)
@@ -626,32 +648,34 @@ Compatible with: **Heroku**, **Railway**, **Render**, **DigitalOcean App Platfor
 - ✅ Health check endpoint (`/health`)
 
 ### Security Before → After
-| Before | After |
-|---|---|
-| ❌ No authentication | ✅ JWT + HTTP Basic Auth |
-| ❌ No file validation | ✅ Extension, size, path traversal, structure |
-| ❌ Hardcoded credentials | ✅ `.env` environment variables |
-| ❌ No audit logging | ✅ All events logged (INFO level) |
-| ❌ Admin routes exposed | ✅ HTTP Basic Auth protected |
+
+| Before                   | After                                         |
+| ------------------------ | --------------------------------------------- |
+| ❌ No authentication     | ✅ JWT + HTTP Basic Auth                      |
+| ❌ No file validation    | ✅ Extension, size, path traversal, structure |
+| ❌ Hardcoded credentials | ✅ `.env` environment variables               |
+| ❌ No audit logging      | ✅ All events logged (INFO level)             |
+| ❌ Admin routes exposed  | ✅ HTTP Basic Auth protected                  |
 
 ---
 
 ## 🐛 Known Issues & Limitations
 
-| Limitation | Detail | Workaround |
-|---|---|---|
-| Minimum data size | < 15 months → MAPE ~54% | Use at least 24 months |
-| Forecast horizon | Accuracy degrades beyond 12 months | Cap UI slider at 12 months |
-| Synchronous training | Blocks API during fitting | Train during off-peak hours |
-| No server-side cache | Each `/predict/` call re-runs | Handled client-side via `localStorage` |
-| Single model | No ensemble / fallback | Planned for v2 |
-| No automated tests | Tests directory is empty | Manual validation exists (`test_model.py`) |
+| Limitation           | Detail                             | Workaround                                 |
+| -------------------- | ---------------------------------- | ------------------------------------------ |
+| Minimum data size    | < 15 months → MAPE ~54%            | Use at least 24 months                     |
+| Forecast horizon     | Accuracy degrades beyond 12 months | Cap UI slider at 12 months                 |
+| Synchronous training | Blocks API during fitting          | Train during off-peak hours                |
+| No server-side cache | Each `/predict/` call re-runs      | Handled client-side via `localStorage`     |
+| Single model         | No ensemble / fallback             | Planned for v2                             |
+| No automated tests   | Tests directory is empty           | Manual validation exists (`test_model.py`) |
 
 ---
 
 ## 🧪 Testing
 
 ### Manual Model Validation
+
 ```bash
 python3 test_model.py
 ```
@@ -659,6 +683,7 @@ python3 test_model.py
 Tests cover: data loading, feature engineering, training, metrics computation, edge cases (missing columns, small dataset), prediction range validation.
 
 ### Automated Tests (Future — Not Yet Written)
+
 ```bash
 # Add to requirements.txt when implementing:
 # pytest==7.4.3
@@ -679,24 +704,28 @@ Planned test areas: unit tests (model, auth, loader), integration tests (all end
 ## 📋 Roadmap
 
 ### Immediate (Before any production launch)
+
 - [ ] Set strong `SECRET_KEY` and change `ADMIN_PASSWORD`
 - [ ] Configure HTTPS
 - [ ] Enable CORS for your production domain
 - [ ] Add basic uptime monitoring
 
 ### Short-term (1–2 weeks)
+
 - [ ] Write automated tests (target 70% coverage)
 - [ ] Add rate limiting middleware
 - [ ] Add Pydantic response models for type-safe API
 - [ ] Set up CI/CD pipeline (push-to-deploy)
 
 ### Medium-term (1–3 months)
+
 - [ ] PostgreSQL integration (prediction history, user management)
 - [ ] Automated monthly model retraining (APScheduler)
 - [ ] Redis prediction caching
 - [ ] Advanced analytics dashboard (confidence intervals, trend decomposition)
 
 ### Long-term (3–6 months)
+
 - [ ] Real-time data ingestion APIs (EIA, World Bank)
 - [ ] Multiple model ensemble (SARIMAX + Prophet + LSTM)
 - [ ] Multi-fuel support (petrol, diesel, kerosene)
@@ -708,22 +737,22 @@ Planned test areas: unit tests (model, auth, loader), integration tests (all end
 
 ## 📦 Dependencies
 
-| Library | Purpose |
-|---|---|
-| `fastapi` | Web framework |
-| `uvicorn` + `gunicorn` | ASGI server |
-| `jinja2` | HTML templating |
-| `pandas` + `numpy` | Data manipulation |
-| `statsmodels` | SARIMAX implementation |
-| `joblib` | Model persistence |
-| `passlib[bcrypt]` | Password hashing |
-| `python-jose` | JWT handling |
-| `python-multipart` | Form/file upload parsing |
-| `python-dotenv` | `.env` loading |
-| `sqlalchemy` + `psycopg2-binary` | DB ORM (planned) |
-| `apscheduler` | Task scheduling (planned) |
-| `pulp` | Price cap optimization |
-| `Chart.js` (CDN) | Frontend visualization |
+| Library                          | Purpose                   |
+| -------------------------------- | ------------------------- |
+| `fastapi`                        | Web framework             |
+| `uvicorn` + `gunicorn`           | ASGI server               |
+| `jinja2`                         | HTML templating           |
+| `pandas` + `numpy`               | Data manipulation         |
+| `statsmodels`                    | SARIMAX implementation    |
+| `joblib`                         | Model persistence         |
+| `passlib[bcrypt]`                | Password hashing          |
+| `python-jose`                    | JWT handling              |
+| `python-multipart`               | Form/file upload parsing  |
+| `python-dotenv`                  | `.env` loading            |
+| `sqlalchemy` + `psycopg2-binary` | DB ORM (planned)          |
+| `apscheduler`                    | Task scheduling (planned) |
+| `pulp`                           | Price cap optimization    |
+| `Chart.js` (CDN)                 | Frontend visualization    |
 
 ---
 
@@ -739,13 +768,13 @@ Planned test areas: unit tests (model, auth, loader), integration tests (all end
 
 ## 📞 Support
 
-| Need | Resource |
-|---|---|
-| API reference | http://127.0.0.1:8000/docs |
-| Application logs | Console output (stdout) |
-| UI errors | Browser developer console |
-| Config issues | Check `.env` against `.env.example` |
-| Issues | Open a GitHub issue |
+| Need             | Resource                            |
+| ---------------- | ----------------------------------- |
+| API reference    | http://127.0.0.1:8000/docs          |
+| Application logs | Console output (stdout)             |
+| UI errors        | Browser developer console           |
+| Config issues    | Check `.env` against `.env.example` |
+| Issues           | Open a GitHub issue                 |
 
 ---
 

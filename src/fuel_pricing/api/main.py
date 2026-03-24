@@ -11,22 +11,24 @@ Features:
 """
 
 from fastapi import FastAPI, UploadFile, File, Request, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from datetime import timedelta
-    
+
 import pandas as pd
 import shutil
 import secrets
 import logging
+import joblib
+import os
 
 from fuel_pricing.ml.sarimax_model import FuelSARIMAXModel
 from fuel_pricing.data.loader import load_and_prepare
 from fuel_pricing.pipelines.predict_pipeline import run_prediction
-from fuel_pricing.core.config import UPLOAD_DIR
+from fuel_pricing.core.config import UPLOAD_DIR, PROCESSED_DIR
 from fuel_pricing.api.auth import (
     authenticate_user,
     create_access_token,
@@ -46,6 +48,9 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Ensure upload directory exists
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Metrics storage path (absolute via config)
+METRICS_PATH = PROCESSED_DIR / "metrics.pkl"
 
 # Initialize FastAPI
 app = FastAPI(
@@ -194,9 +199,6 @@ async def upload_file(file: UploadFile = File(...)):
         return {"error": f"Upload failed: {str(e)}"}
 
 
-from fuel_pricing.core.config import PROCESSED_DIR
-import os
-
 def get_training_data() -> pd.DataFrame:
     """
     Dynamically loads and merges all available processed datasets.
@@ -286,11 +288,31 @@ def train_model():
             model.train_sarimax(df)
 
         logger.info("Model training completed successfully")
-        return {"message": "Model trained successfully."}
+        return {
+            "message": "Model trained successfully.",
+            "metrics": model.metrics,
+        }
 
     except Exception as e:
         logger.error(f"Training error: {str(e)}")
         return {"error": f"Training failed: {str(e)}"}
+
+
+# -------------------------------------------------------
+# MODEL METRICS
+# -------------------------------------------------------
+
+@app.get("/metrics/")
+def get_metrics():
+    """Return the latest model training evaluation metrics."""
+    try:
+        if not METRICS_PATH.exists():
+            return {"error": "No metrics found. Train the model first."}
+        metrics = joblib.load(METRICS_PATH)
+        return metrics
+    except Exception as e:
+        logger.error(f"Metrics fetch error: {str(e)}")
+        return {"error": str(e)}
 
 
 # -------------------------------------------------------
@@ -300,23 +322,34 @@ def train_model():
 @app.post("/predict/")
 def predict_price(steps: int = Form(...)):
     """
-    Predict future fuel prices.
-    Predicts cleanly based on the currently applied dataset context.
+    Predict future fuel prices with confidence intervals and real date labels.
     """
     try:
         df = get_training_data()
-        
+
         # Use last known exogenous values for forecasting forward
         future_exog = df.drop(columns=["price"]).iloc[-steps:].copy()
 
         model = FuelSARIMAXModel()
-        forecast = model.predict(steps=steps, future_exog=future_exog)
+        forecast_result = model.predict(steps=steps, future_exog=future_exog)
+
+        predicted  = forecast_result["predicted_mean"]
+        lower_ci   = forecast_result["lower_ci"]
+        upper_ci   = forecast_result["upper_ci"]
+
+        # Generate real future date labels from the training data's last date
+        last_date = df.index[-1]
+        future_dates = pd.date_range(start=last_date, periods=steps + 1, freq="MS")[1:]
+        date_labels = [d.strftime("%b %Y") for d in future_dates]
 
         return {
             "forecast_steps": steps,
-            "predicted_prices": forecast.tolist()
+            "predicted_prices": predicted.tolist(),
+            "lower_ci":         lower_ci.tolist(),
+            "upper_ci":         upper_ci.tolist(),
+            "date_labels":      date_labels.tolist(),
         }
-        
+
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
         return {"error": str(e)}
@@ -357,6 +390,34 @@ def admin_dashboard(request: Request, username: str = Depends(verify_admin)):
             "files": files
         }
     )
+
+
+# -------------------------------------------------------
+# PURGE UPLOADED FILE (Admin-protected)
+# -------------------------------------------------------
+
+@app.post("/admin/purge/{filename}")
+def purge_file(
+    filename: str,
+    request: Request,
+    username: str = Depends(verify_admin),
+):
+    """
+    Delete a specific uploaded CSV file.
+    Protected by HTTP Basic Auth (same as admin dashboard).
+    """
+    # Sanitize filename — block path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_path.unlink()
+    logger.info(f"File '{filename}' deleted by admin: {username}")
+    # Redirect back to admin dashboard after deletion
+    return RedirectResponse(url="/admin/", status_code=303)
 
 
 # -------------------------------------------------------

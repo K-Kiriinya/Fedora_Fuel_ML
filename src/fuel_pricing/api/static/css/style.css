@@ -571,3 +571,112 @@ details.data-requirements .req-content {
         min-height: 300px;
     }
 }
+
+/* ─── Metrics Mini Cards ─── */
+.metrics-mini {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+    animation: slideUp 0.4s ease;
+}
+.metric-card {
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+[data-theme='dark'] .metric-card {
+    background: rgba(129, 140, 248, 0.1);
+    border-color: rgba(129, 140, 248, 0.25);
+}
+.metric-label {
+    font-size: 0.65em;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.metric-value {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+.metric-unit {
+    font-size: 0.65em;
+    color: var(--text-secondary);
+}
+
+/* ─── Forecast Results Table ─── */
+#resultsTableWrap::-webkit-scrollbar { width: 5px; height: 5px; }
+#resultsTableWrap::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 10px; }
+
+.forecast-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.87em;
+}
+.forecast-table thead th {
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 2px solid var(--card-border);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    backdrop-filter: blur(8px);
+    text-align: left;
+}
+.forecast-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+.forecast-table tbody tr:last-child td { border-bottom: none; }
+.forecast-table tbody tr:hover td {
+    background: rgba(99, 102, 241, 0.04);
+}
+[data-theme='dark'] .forecast-table tbody tr:hover td {
+    background: rgba(129, 140, 248, 0.06);
+}
+.ci-range {
+    color: var(--text-secondary);
+    font-size: 0.82em;
+    font-variant-numeric: tabular-nums;
+}
+.ci-up    { color: #ef4444; font-weight: 600; font-size: 0.85em; }
+.ci-down  { color: var(--success); font-weight: 600; font-size: 0.85em; }
+.ci-flat  { color: var(--text-secondary); font-size: 0.85em; }
+
+/* ─── Admin Small Delete Button ─── */
+.btn-danger-sm {
+    width: auto;
+    padding: 4px 10px;
+    font-size: 0.76em;
+    border-radius: 6px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: none;
+    font-weight: 600;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.2s;
+}
+.btn-danger-sm:hover {
+    background: #dc2626;
+    transform: none;
+    box-shadow: none;
+}

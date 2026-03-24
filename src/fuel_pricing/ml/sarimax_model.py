@@ -39,7 +39,7 @@ class FuelSARIMAXModel:
     def __init__(self):
         self.model = None
         self.results = None
-        self.metrics ={}
+        self.metrics = {}
 
         # Ensure directory exists
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -213,9 +213,9 @@ class FuelSARIMAXModel:
     # -----------------------
     # STEP 4: PREDICT FUTURE
     # -----------------------
-    def predict(self, steps: int, future_exog: pd.DataFrame):
+    def predict(self, steps: int, future_exog: pd.DataFrame) -> dict:
         """
-        Forecast future fuel prices.
+        Forecast future fuel prices with confidence intervals.
 
         Parameters
         ----------
@@ -226,8 +226,8 @@ class FuelSARIMAXModel:
 
         Returns
         -------
-        Series
-            Forecasted prices.
+        dict
+            Keys: predicted_mean, lower_ci, upper_ci (all pd.Series)
         """
 
         if not MODEL_PATH.exists():
@@ -246,7 +246,13 @@ class FuelSARIMAXModel:
             exog=future_exog
         )
 
-        return forecast.predicted_mean
+        conf_int = forecast.conf_int()
+
+        return {
+            "predicted_mean": forecast.predicted_mean,
+            "lower_ci": conf_int.iloc[:, 0],
+            "upper_ci": conf_int.iloc[:, 1],
+        }
 
     # -------------------------
     # MODEL SUMMARY

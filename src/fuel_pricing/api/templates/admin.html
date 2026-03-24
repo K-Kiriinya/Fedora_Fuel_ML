@@ -54,6 +54,7 @@
                                     <tr>
                                         <th>File Name</th>
                                         <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -64,6 +65,12 @@
                                             <span class="file-name">{{ file.name }}</span>
                                         </td>
                                         <td><span class="badge badge-success">Verified</span></td>
+                                        <td>
+                                            <form method="POST" action="/admin/purge/{{ file.name }}"
+                                                  onsubmit="return confirm('Permanently delete {{ file.name }}?')">
+                                                <button type="submit" class="btn-danger-sm">🗑 Delete</button>
+                                            </form>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -117,6 +124,28 @@
                         <div class="info-item">
                             <label>Memory Path</label>
                             <span style="word-break: break-all;">data/processed/sarimax_model.pkl</span>
+                        </div>
+                    </div>
+
+                    <!-- Live Model Accuracy Metrics -->
+                    <div style="margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 14px;">
+                        <h2 style="font-size: 1em; margin-bottom: 10px;">📊 Model Accuracy</h2>
+                        <div id="adminMetricsGrid" class="metrics-mini">
+                            <div class="metric-card">
+                                <span class="metric-label">MAE</span>
+                                <span class="metric-value" id="adminMAE">—</span>
+                                <span class="metric-unit">KES</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">RMSE</span>
+                                <span class="metric-value" id="adminRMSE">—</span>
+                                <span class="metric-unit">KES</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">MAPE</span>
+                                <span class="metric-value" id="adminMAPE">—</span>
+                                <span class="metric-unit">%</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -203,7 +232,28 @@
         }
 
         function clearData() {
-            alert('⚠️ Database purging must be performed securely via Docker Volume unmounting or Admin Terminal currently.');
+            alert('⚠️ To delete all data, use the per-file 🗑 Delete buttons in the Ingested Datasets table above.');
+        }
+
+        /* === LOAD METRICS FROM API === */
+        async function loadAdminMetrics() {
+            try {
+                const resp = await fetch('/metrics/');
+                const m = await resp.json();
+                if (!m.error) {
+                    document.getElementById('adminMAE').textContent  = parseFloat(m.MAE).toFixed(2);
+                    document.getElementById('adminRMSE').textContent = parseFloat(m.RMSE).toFixed(2);
+                    document.getElementById('adminMAPE').textContent = parseFloat(m.MAPE).toFixed(2);
+                } else {
+                    ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
+                        document.getElementById(id).textContent = 'N/A'
+                    );
+                }
+            } catch {
+                ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
+                    document.getElementById(id).textContent = 'Error'
+                );
+            }
         }
 
         /* === ADMIN FORECAST GRAPH SYNCHRONIZATION === */
