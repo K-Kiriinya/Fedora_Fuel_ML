@@ -1,38 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --text-primary: #0f172a;
+    --text-primary: #111827;
     --text-secondary: #4b5563;
-    --card-bg: rgba(255, 255, 255, 0.8);
-    --card-border: rgba(0, 0, 0, 0.08);
-    --accent: #0ea5e9;
-    --accent-hover: #0284c7;
-    --input-bg: rgba(249, 250, 251, 0.9);
-    --input-border: rgba(14, 165, 233, 0.3);
-    --shadow: rgba(0, 0, 0, 0.06);
-    --mesh-bg: linear-gradient(-45deg, #ffffff, #f1f5f9, #e2e8f0, #f8fafc);
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-border: rgba(0, 0, 0, 0.05);
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --chart-accent: #f59e0b;
+    --input-bg: rgba(249, 250, 251, 0.95);
+    --input-border: rgba(37, 99, 235, 0.2);
+    --shadow: rgba(0, 0, 0, 0.04);
+    --mesh-bg: linear-gradient(-45deg, #f9fafb, #f3f4f6, #fffbeb, #fef3c7);
     --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.1);
+    --success-bg: rgba(16, 185, 129, 0.08);
     --warning: #f59e0b;
     --danger: #ef4444;
-    --danger-bg: rgba(239, 68, 68, 0.1);
-    --chart-grid: rgba(0, 0, 0, 0.04);
+    --danger-bg: rgba(239, 68, 68, 0.08);
+    --chart-grid: rgba(0, 0, 0, 0.03);
 }
 
 [data-theme='dark'] {
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --card-bg: rgba(15, 23, 42, 0.75);
-    --card-border: rgba(255, 255, 255, 0.06);
-    --accent: #38bdf8;
-    --accent-hover: #0ea5e9;
-    --input-bg: rgba(30, 41, 59, 0.8);
-    --input-border: rgba(56, 189, 248, 0.3);
-    --shadow: rgba(0, 0, 0, 0.3);
-    --mesh-bg: linear-gradient(-45deg, #020617, #0f172a, #1e293b, #000000);
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --card-bg: rgba(9, 9, 11, 0.8);
+    --card-border: rgba(255, 255, 255, 0.05);
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --chart-accent: #fbbf24;
+    --input-bg: rgba(24, 24, 27, 0.9);
+    --input-border: rgba(59, 130, 246, 0.2);
+    --shadow: rgba(0, 0, 0, 0.4);
+    --mesh-bg: linear-gradient(-45deg, #020617, #1e3a8a, #451a03, #000000);
     --success: #34d399;
-    --success-bg: rgba(52, 211, 153, 0.1);
-    --chart-grid: rgba(255, 255, 255, 0.05);
+    --success-bg: rgba(52, 211, 153, 0.08);
+    --chart-grid: rgba(255, 255, 255, 0.04);
 }
 
 * {
@@ -253,7 +255,7 @@ button {
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    box-shadow: 0 4px 14px 0 rgba(14, 165, 233, 0.3);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1);
     transition: all 0.2s ease;
     display: flex;
     justify-content: center;
@@ -263,7 +265,7 @@ button {
 button:hover:not(:disabled) {
     background: var(--accent-hover);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.23);
+    box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.2);
 }
 button:active:not(:disabled) {
     transform: translateY(0);
@@ -588,8 +590,8 @@ details.data-requirements .req-content {
     animation: slideUp 0.4s ease;
 }
 .metric-card {
-    background: rgba(14, 165, 233, 0.06);
-    border: 1px solid rgba(14, 165, 233, 0.2);
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.15);
     border-radius: 10px;
     padding: 10px 8px;
     text-align: center;
@@ -598,8 +600,8 @@ details.data-requirements .req-content {
     gap: 3px;
 }
 [data-theme='dark'] .metric-card {
-    background: rgba(56, 189, 248, 0.08);
-    border-color: rgba(56, 189, 248, 0.2);
+    background: rgba(52, 211, 153, 0.06);
+    border-color: rgba(52, 211, 153, 0.15);
 }
 .metric-label {
     font-size: 0.65em;
@@ -650,10 +652,10 @@ details.data-requirements .req-content {
 }
 .forecast-table tbody tr:last-child td { border-bottom: none; }
 .forecast-table tbody tr:hover td {
-    background: rgba(14, 165, 233, 0.04);
+    background: rgba(16, 185, 129, 0.03);
 }
 [data-theme='dark'] .forecast-table tbody tr:hover td {
-    background: rgba(56, 189, 248, 0.06);
+    background: rgba(52, 211, 153, 0.05);
 }
 .ci-range {
     color: var(--text-secondary);
