@@ -1,7 +1,7 @@
-# This file is to help avoid hard coding paths.
+# This helps in avoiding hard coding paths.
 
 # from __future__ import annotations
-#import os
+# import os
 from pathlib import Path
 
 # BASE_DIR resolves to project root automatically

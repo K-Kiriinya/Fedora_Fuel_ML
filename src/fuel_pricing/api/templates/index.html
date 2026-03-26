@@ -151,6 +151,10 @@
     </div>
 
     <script>
+        let forecastChartInstance = null;
+        let historyChartInstance = null;
+        let cachedHistoryData = null;
+
         /* === THEME & STATUS LOGIC === */
         const themeToggle = document.getElementById('themeToggle');
         const themeIcon = document.getElementById('themeIcon');
@@ -159,6 +163,8 @@
         const storedTheme = localStorage.getItem('theme') || 'light';
         htmlElement.setAttribute('data-theme', storedTheme);
         themeIcon.textContent = storedTheme === 'dark' ? '☀️' : '🌙';
+        const themeTextLabel = themeToggle.querySelector('.text');
+        if (themeTextLabel) themeTextLabel.textContent = storedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
 
         themeToggle.addEventListener('click', () => {
             const currentTheme = htmlElement.getAttribute('data-theme');
@@ -166,6 +172,7 @@
             htmlElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            if (themeTextLabel) themeTextLabel.textContent = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
 
             const cachedPred = localStorage.getItem('latest_prediction');
             if (cachedPred && forecastChartInstance) {
@@ -176,6 +183,11 @@
                     p.upper_ci   || [],
                     p.date_labels || null
                 );
+            }
+
+            // Update history chart colors without re-fetching
+            if (cachedHistoryData) {
+                renderHistoryChart(cachedHistoryData);
             }
         });
 
@@ -298,7 +310,6 @@
             }
         });
 
-        let forecastChartInstance = null;
 
         // Predict Form Logic
         document.getElementById('predictForm').addEventListener('submit', async (e) => {
@@ -383,9 +394,10 @@
 
             const labels = dateLabels || prices.map((_, i) => `Month ${i + 1}`);
 
+            const theme      = document.documentElement.getAttribute('data-theme');
             const style      = getComputedStyle(document.body);
-            const textColor  = style.getPropertyValue('--text-primary').trim()  || '#1e293b';
-            const gridColor  = style.getPropertyValue('--chart-grid').trim()    || 'rgba(0,0,0,0.05)';
+            const textColor  = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
+            const gridColor  = theme === 'dark' ? 'rgba(255,255,255,0.1)' : (style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)');
             const accentColor= style.getPropertyValue('--accent').trim()        || '#2563eb';
             const fuelColor  = style.getPropertyValue('--chart-accent').trim()  || '#f59e0b';
 
@@ -453,15 +465,15 @@
                                 display: true,
                                 labels: {
                                     color: textColor,
-                                    font: { family: 'Outfit', size: 13, weight: '600' },
+                                    font: { family: 'Lexend', size: 13, weight: '600' },
                                     // Hide CI band labels from legend
                                     filter: item => item.text === 'Projected Price (KES)',
                                 }
                             },
                             tooltip: {
                                 backgroundColor: 'rgba(15,23,42,0.9)',
-                                titleFont: { family: 'Outfit', size: 14 },
-                                bodyFont:  { family: 'Outfit', size: 13 },
+                                titleFont: { family: 'Lexend', size: 14 },
+                                bodyFont:  { family: 'Lexend', size: 13 },
                                 padding: 12,
                                 cornerRadius: 8,
                                 callbacks: {
@@ -475,11 +487,11 @@
                         },
                         scales: {
                             y: {
-                                ticks: { color: textColor, font: { family: 'Outfit' }, callback: v => 'KES ' + v },
+                                ticks: { color: textColor, font: { family: 'Lexend' }, callback: v => 'KES ' + v },
                                 grid:  { color: gridColor, drawBorder: false }
                             },
                             x: {
-                                ticks: { color: textColor, font: { family: 'Outfit' } },
+                                ticks: { color: textColor, font: { family: 'Lexend' } },
                                 grid:  { display: false }
                             }
                         }
@@ -507,89 +519,101 @@
                 const response = await fetch('/history/');
                 const data = await response.json();
                 if (data.error) return;
+                cachedHistoryData = data;
+                renderHistoryChart(data);
+            } catch (e) { 
+                console.error('History load error:', e); 
+            }
+        }
 
-                const ctx = document.getElementById('historyChart').getContext('2d');
-                const style = getComputedStyle(document.body);
-                const textColor = style.getPropertyValue('--text-primary').trim() || '#1e293b';
-                
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.labels,
-                        datasets: [
-                            {
-                                label: 'Petrol (PMS)',
-                                data: data.pms,
-                                borderColor: '#ef4444',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2.5,
-                                pointRadius: 0,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Diesel (AGO)',
-                                data: data.ago,
-                                borderColor: '#f59e0b',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2.5,
-                                pointRadius: 0,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Kerosene',
-                                data: data.kero,
-                                borderColor: '#38bdf8',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2.5,
-                                pointRadius: 0,
-                                tension: 0.3
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        color: textColor,
-                        interaction: { intersect: false, mode: 'index' },
-                        plugins: {
-                            legend: { 
-                                display: true, 
-                                position: 'top', 
-                                labels: { 
-                                    color: textColor, 
-                                    padding: 10,
-                                    font: { family: 'Outfit', size: 11, weight: '600' },
-                                    boxWidth: 12
-                                } 
-                            },
-                            tooltip: { 
-                                backgroundColor: 'rgba(15,23,42,0.9)', 
-                                padding: 12,
-                                usePointStyle: true,
-                                callbacks: {
-                                    label: context => ` ${context.dataset.label}: KES ${parseFloat(context.parsed.y).toFixed(2)}`
-                                }
-                            }
+        function renderHistoryChart(data) {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            if (historyChartInstance) historyChartInstance.destroy();
+
+            const theme = document.documentElement.getAttribute('data-theme');
+            const style = getComputedStyle(document.body);
+            const textColor = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
+            const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.04)';
+            
+            historyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: 'Petrol (PMS)',
+                            data: data.pms,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.3
                         },
-                        scales: {
-                            y: { 
-                                beginAtZero: false,
-                                ticks: { color: textColor, font: { size: 10 } }, 
-                                grid: { color: 'rgba(0,0,0,0.03)' } 
-                            },
-                            x: { 
-                                ticks: { 
-                                    color: textColor, 
-                                    font: { size: 9 }, 
-                                    autoSkip: true, 
-                                    maxTicksLimit: 10 
-                                }, 
-                                grid: { display: false } 
+                        {
+                            label: 'Diesel (AGO)',
+                            data: data.ago,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Kerosene',
+                            data: data.kero,
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    color: textColor,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { 
+                            display: true, 
+                            position: 'top', 
+                            labels: { 
+                                color: textColor, 
+                                padding: 10,
+                                font: { family: 'Lexend', size: 11, weight: '600' },
+                                boxWidth: 12
+                            } 
+                        },
+                        tooltip: { 
+                            backgroundColor: 'rgba(15,23,42,0.9)', 
+                            padding: 12,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: context => ` ${context.dataset.label}: KES ${parseFloat(context.parsed.y).toFixed(2)}`
                             }
                         }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: false,
+                            ticks: { color: textColor, font: { size: 11 } }, 
+                            grid: { color: gridColor },
+                            border: { color: gridColor }
+                        },
+                        x: { 
+                            ticks: { 
+                                color: textColor, 
+                                font: { size: 10.5 }, 
+                                autoSkip: true, 
+                                maxTicksLimit: 10 
+                            }, 
+                            grid: { display: false },
+                            border: { color: gridColor }
+                        }
                     }
-                });
-            } catch (e) { console.error('History load error:', e); }
+                }
+            });
         }
 
         async function autoGenerateDefault() {

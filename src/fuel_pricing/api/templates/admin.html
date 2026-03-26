@@ -269,9 +269,10 @@
 
             const labels = prices.map((_, i) => `Month ${i + 1}`);
             
+            const theme = document.documentElement.getAttribute('data-theme');
             const style = getComputedStyle(document.body);
-            const textColor = style.getPropertyValue('--text-primary').trim() || '#1e293b';
-            const gridColor = style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)';
+            const textColor = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
+            const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.1)' : (style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)');
             const accentColor = style.getPropertyValue('--accent').trim() || '#10b981';
 
             const fuelColor = style.getPropertyValue('--chart-accent').trim() || '#10b981';
@@ -307,12 +308,12 @@
                         maintainAspectRatio: false,
                         color: textColor,
                         plugins: {
-                            legend: { display: true, labels: { color: textColor, font: { family: 'Outfit', size: 12, weight: '600' } } },
+                            legend: { display: true, labels: { color: textColor, font: { family: 'Lexend', size: 12, weight: '600' } } },
                             tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
                         },
                         scales: {
-                            y: { ticks: { color: textColor, font: { family: 'Outfit', size: 10 } }, grid: { color: gridColor, drawBorder: false } },
-                            x: { ticks: { color: textColor, font: { family: 'Outfit', size: 10 } }, grid: { display: false } }
+                            y: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { color: gridColor, drawBorder: false } },
+                            x: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { display: false } }
                         }
                     }
                 });
