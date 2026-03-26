@@ -1,335 +1,337 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+    
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Fedora Fuel ML</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
+
 </head>
-<body>
-    <div class="container">
-        <!-- Top Controls: Theme Toggle -->
-        <div class="top-controls">
-            <a href="/" class="back-link">← Back to Engine</a>
-            <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
-                <span id="themeIcon">🌙</span> <span class="text">Dark Mode</span>
-            </button>
-        </div>
-
-        <div class="header">
-            <h1>⚙️ Central Command</h1>
-            <p>System Overview & Data Registry</p>
-        </div>
-
-        <!-- Statistics Row Constraint -->
-        <div class="stats">
-            <div class="stat-box">
-                <h3>{{ files|length }}</h3>
-                <p>Ingested Matrices</p>
+    <body>
+        <div class="container">
+            <!-- Top Controls: Theme Toggle -->
+            <div class="top-controls">
+                <a href="/" class="back-link">← Back to Engine</a>
+                <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
+                    <span id="themeIcon">🌙</span> <span class="text">Dark Mode</span>
+                </button>
             </div>
-            <div class="stat-box">
-                <h3 id="modelStatusUI">
-                    <span class="badge badge-warning">Loading...</span>
-                </h3>
-                <p>Coprocessor Status</p>
-            </div>
-            <div class="stat-box">
-                <h3>SARIMAX</h3>
-                <p>Architecture</p>
-            </div>
-        </div>
 
-        <!-- 2 Column Layout Constraint -->
-        <div class="admin-grid">
-            
-            <!-- Left Panel -->
-            <div class="card" style="display: flex; flex-direction: column; overflow: hidden; justify-content: space-between;">
-                <div>
-                    <h2>📁 Ingested Datasets</h2>
-                    <div class="table-wrapper">
-                        {% if files|length > 0 %}
-                            <table class="files-table">
-                                <thead>
-                                    <tr>
-                                        <th>File Name</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for file in files %}
-                                    <tr>
-                                        <td>
-                                            <span class="file-icon">📄</span>
-                                            <span class="file-name">{{ file.name }}</span>
-                                        </td>
-                                        <td><span class="badge badge-success">Verified</span></td>
-                                        <td>
-                                            <form method="POST" action="/admin/purge/{{ file.name }}"
-                                                  onsubmit="return confirm('Permanently delete {{ file.name }}?')">
-                                                <button type="submit" class="btn-danger-sm">🗑 Delete</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        {% else %}
-                            <p style="color: var(--text-secondary); margin-top: 10px; font-style: italic;">
-                                No databanks present. Supply a CSV matrix from the main engine interface.
-                            </p>
-                        {% endif %}
-                    </div>
+            <div class="header">
+                <h1>⚙️ Central Command</h1>
+                <p>System Overview & Data Registry</p>
+            </div>
+
+            <!-- Statistics Row Constraint -->
+            <div class="stats">
+                <div class="stat-box">
+                    <h3>{{ files|length }}</h3>
+                    <p>Ingested Matrices</p>
                 </div>
-
-                <div style="margin-top: 20px;">
-                    <h2>⚡ Macro Controls</h2>
-                    <div class="action-buttons">
-                        <button class="btn btn-primary" onclick="trainModel(this)">
-                            🤖 Force Retrain Sequence
-                        </button>
-                        <form method="POST" action="/admin/purge_all" style="width: 100%;"
-                              onsubmit="return confirm('CRITICAL: Purge ALL uploaded databanks permanently? System will reset to default clean sets.')">
-                            <button type="submit" class="btn btn-danger">💥 Purge All Local Data</button>
-                        </form>
-                    </div>
+                <div class="stat-box">
+                    <h3 id="modelStatusUI">
+                        <span class="badge badge-warning">Loading...</span>
+                    </h3>
+                    <p>Coprocessor Status</p>
+                </div>
+                <div class="stat-box">
+                    <h3>SARIMAX</h3>
+                    <p>Architecture</p>
                 </div>
             </div>
 
-            <!-- Right Panel -->
-            <div class="card" style="display: flex; flex-direction: column; overflow: hidden;">
-                <h2>🤖 Predictive Parameters</h2>
-                <div class="model-info table-wrapper" style="margin-top: 5px;">
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>Order (p, d, q)</label>
-                            <span>(1, 1, 1)</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Seasonal Topology</label>
-                            <span>(1, 1, 1, 12)</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Temporal Cycles</label>
-                            <span>12 months</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Validation Split</label>
-                            <span>20% Holdout</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Exogenous Shocks</label>
-                            <span>Enabled / Monitored</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Memory Path</label>
-                            <span style="word-break: break-all;">data/processed/sarimax_model.pkl</span>
-                        </div>
-                    </div>
-
-                    <!-- Live Model Accuracy Metrics -->
-                    <div style="margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 14px;">
-                        <h2 style="font-size: 1em; margin-bottom: 10px;">📊 Model Accuracy</h2>
-                        <div id="adminMetricsGrid" class="metrics-mini">
-                            <div class="metric-card">
-                                <span class="metric-label">MAE</span>
-                                <span class="metric-value" id="adminMAE">—</span>
-                                <span class="metric-unit">KES</span>
-                            </div>
-                            <div class="metric-card">
-                                <span class="metric-label">RMSE</span>
-                                <span class="metric-value" id="adminRMSE">—</span>
-                                <span class="metric-unit">KES</span>
-                            </div>
-                            <div class="metric-card">
-                                <span class="metric-label">MAPE</span>
-                                <span class="metric-value" id="adminMAPE">—</span>
-                                <span class="metric-unit">%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <!-- 2 Column Layout Constraint -->
+            <div class="admin-grid">
                 
-                <!-- Latest User Forecast Graph -->
-                <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
-                    <h2 style="font-size: 1.1em; margin-bottom: 10px;">📉 Latest User Forecast Sync</h2>
-                    
-                    <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center;">
-                        <span style="font-size: 2em; margin-bottom: 10px;">💤</span>
-                        <span style="font-size: 0.9em;">No cached forecast available.<br>Switch to Engine to run one.</span>
+                <!-- Left Panel -->
+                <div class="card" style="display: flex; flex-direction: column; overflow: hidden; justify-content: space-between;">
+                    <div>
+                        <h2>📁 Ingested Datasets</h2>
+                        <div class="table-wrapper">
+                            {% if files|length > 0 %}
+                                <table class="files-table">
+                                    <thead>
+                                        <tr>
+                                            <th>File Name</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for file in files %}
+                                        <tr>
+                                            <td>
+                                                <span class="file-icon">📄</span>
+                                                <span class="file-name">{{ file.name }}</span>
+                                            </td>
+                                            <td><span class="badge badge-success">Verified</span></td>
+                                            <td>
+                                                <form method="POST" action="/admin/purge/{{ file.name }}"
+                                                    onsubmit="return confirm('Permanently delete {{ file.name }}?')">
+                                                    <button type="submit" class="btn-danger-sm">🗑 Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p style="color: var(--text-secondary); margin-top: 10px; font-style: italic;">
+                                    No databanks present. Supply a CSV matrix from the main engine interface.
+                                </p>
+                            {% endif %}
+                        </div>
                     </div>
 
-                    <div id="adminChartContainer" style="display: none; flex: 1; min-height: 0; position: relative;">
-                        <canvas id="adminForecastChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
+                    <div style="margin-top: 20px;">
+                        <h2>⚡ Macro Controls</h2>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" onclick="trainModel(this)">
+                                🤖 Force Retrain Sequence
+                            </button>
+                            <form method="POST" action="/admin/purge_all" style="width: 100%;"
+                                onsubmit="return confirm('CRITICAL: Purge ALL uploaded databanks permanently? System will reset to default clean sets.')">
+                                <button type="submit" class="btn btn-danger">💥 Purge All Local Data</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Right Panel -->
+                <div class="card" style="display: flex; flex-direction: column; overflow: hidden;">
+                    <h2>🤖 Predictive Parameters</h2>
+                    <div class="model-info table-wrapper" style="margin-top: 5px;">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Order (p, d, q)</label>
+                                <span>(1, 1, 1)</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Seasonal Topology</label>
+                                <span>(1, 1, 1, 12)</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Temporal Cycles</label>
+                                <span>12 months</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Validation Split</label>
+                                <span>20% Holdout</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Exogenous Shocks</label>
+                                <span>Enabled / Monitored</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Memory Path</label>
+                                <span style="word-break: break-all;">data/processed/sarimax_model.pkl</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Model Accuracy Metrics -->
+                        <div style="margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 14px;">
+                            <h2 style="font-size: 1em; margin-bottom: 10px;">📊 Model Accuracy</h2>
+                            <div id="adminMetricsGrid" class="metrics-mini">
+                                <div class="metric-card">
+                                    <span class="metric-label">MAE</span>
+                                    <span class="metric-value" id="adminMAE">—</span>
+                                    <span class="metric-unit">KES</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-label">RMSE</span>
+                                    <span class="metric-value" id="adminRMSE">—</span>
+                                    <span class="metric-unit">KES</span>
+                                </div>
+                                <div class="metric-card">
+                                    <span class="metric-label">MAPE</span>
+                                    <span class="metric-value" id="adminMAPE">—</span>
+                                    <span class="metric-unit">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Latest User Forecast Graph -->
+                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+                        <h2 style="font-size: 1.1em; margin-bottom: 10px;">📉 Latest User Forecast Sync</h2>
+                        
+                        <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center;">
+                            <span style="font-size: 2em; margin-bottom: 10px;">💤</span>
+                            <span style="font-size: 0.9em;">No cached forecast available.<br>Switch to Engine to run one.</span>
+                        </div>
+
+                        <div id="adminChartContainer" style="display: none; flex: 1; min-height: 0; position: relative;">
+                            <canvas id="adminForecastChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-
         </div>
-    </div>
 
-    <script>
-        /* === THEME SYNCHRONIZATION === */
-        const themeToggle = document.getElementById('themeToggle');
-        const themeIcon = document.getElementById('themeIcon');
-        const htmlElement = document.documentElement;
+        <script>
+            /* === THEME SYNCHRONIZATION === */
+            const themeToggle = document.getElementById('themeToggle');
+            const themeIcon = document.getElementById('themeIcon');
+            const htmlElement = document.documentElement;
 
-        const storedTheme = localStorage.getItem('theme') || 'light';
-        htmlElement.setAttribute('data-theme', storedTheme);
-        themeIcon.textContent = storedTheme === 'dark' ? '☀️' : '🌙';
+            const storedTheme = localStorage.getItem('theme') || 'light';
+            htmlElement.setAttribute('data-theme', storedTheme);
+            themeIcon.textContent = storedTheme === 'dark' ? '☀️' : '🌙';
 
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = htmlElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            htmlElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-            
-            // Re-render chart softly to match new theme if present
-            const cachedPred = localStorage.getItem('latest_prediction');
-            if (cachedPred && adminChartInstance) {
-                const parsed = JSON.parse(cachedPred);
-                createAdminChart(parsed.predicted_prices);
-            }
-        });
-
-        /* === STATUS SYNCHRONIZATION === */
-        const status = localStorage.getItem('model_status') || 'needs_data';
-        const uiHead = document.getElementById('modelStatusUI');
-        if (status === 'trained') {
-            uiHead.innerHTML = '<span class="badge badge-success">Online & Ready</span>';
-        } else if (status === 'uploaded') {
-            uiHead.innerHTML = '<span class="badge badge-warning">Needs Optimization</span>';
-        } else {
-            uiHead.innerHTML = '<span class="badge badge-danger">Offline</span>';
-        }
-
-        async function trainModel(btnRef) {
-            if (!confirm('This will trigger a full matrix recalibration. Proceed?')) return;
-
-            const original = btnRef.textContent;
-            btnRef.innerHTML = `Calibrating <div class="spinner"></div>`;
-            btnRef.disabled = true;
-
-            try {
-                const response = await fetch('/train/', { method: 'POST' });
-                const result = await response.json();
-
-                if (result.error) {
-                    alert('❌ Sequence Failed: ' + result.error);
-                } else {
-                    localStorage.setItem('model_status', 'trained');
-                    localStorage.removeItem('latest_prediction');
-                    alert('✅ ' + result.message);
-                    location.reload();
-                }
-            } catch (error) {
-                alert('❌ Connection Error: ' + error.message);
-            } finally {
-                btnRef.textContent = original;
-                btnRef.disabled = false;
-            }
-        }
-
-        function clearData() {
-            alert('⚠️ To delete all data, use the per-file 🗑 Delete buttons in the Ingested Datasets table above.');
-        }
-
-        /* === LOAD METRICS FROM API === */
-        async function loadAdminMetrics() {
-            try {
-                const resp = await fetch('/metrics/');
-                const m = await resp.json();
-                if (!m.error) {
-                    document.getElementById('adminMAE').textContent  = parseFloat(m.MAE).toFixed(2);
-                    document.getElementById('adminRMSE').textContent = parseFloat(m.RMSE).toFixed(2);
-                    document.getElementById('adminMAPE').textContent = parseFloat(m.MAPE).toFixed(2);
-                } else {
-                    ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
-                        document.getElementById(id).textContent = 'N/A'
-                    );
-                }
-            } catch {
-                ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
-                    document.getElementById(id).textContent = 'Error'
-                );
-            }
-        }
-
-        /* === ADMIN FORECAST GRAPH SYNCHRONIZATION === */
-        let adminChartInstance = null;
-
-        function createAdminChart(prices) {
-            document.getElementById('adminPlaceholder').style.display = 'none';
-            document.getElementById('adminChartContainer').style.display = 'flex';
-
-            const ctx = document.getElementById('adminForecastChart').getContext('2d');
-            if (adminChartInstance) adminChartInstance.destroy();
-
-            const labels = prices.map((_, i) => `Month ${i + 1}`);
-            
-            const theme = document.documentElement.getAttribute('data-theme');
-            const style = getComputedStyle(document.body);
-            const textColor = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
-            const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.1)' : (style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)');
-            const accentColor = style.getPropertyValue('--accent').trim() || '#10b981';
-
-            const fuelColor = style.getPropertyValue('--chart-accent').trim() || '#10b981';
-
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            const r = parseInt(fuelColor.slice(1,3), 16) || 99;
-            const g = parseInt(fuelColor.slice(3,5), 16) || 102;
-            const b = parseInt(fuelColor.slice(5,7), 16) || 241;
-            gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
-            gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
-
-            setTimeout(() => {
-                adminChartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Projected Value Overview',
-                            data: prices,
-                            borderColor: fuelColor,
-                            backgroundColor: gradient,
-                            borderWidth: 3,
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 4,
-                            pointBackgroundColor: fuelColor,
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        color: textColor,
-                        plugins: {
-                            legend: { display: true, labels: { color: textColor, font: { family: 'Lexend', size: 12, weight: '600' } } },
-                            tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
-                        },
-                        scales: {
-                            y: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { color: gridColor, drawBorder: false } },
-                            x: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { display: false } }
-                        }
-                    }
-                });
-            }, 10);
-        }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            loadAdminMetrics();
-            const cachedPred = localStorage.getItem('latest_prediction');
-            if (cachedPred) {
-                try {
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = htmlElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                htmlElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+                
+                // Re-render chart softly to match new theme if present
+                const cachedPred = localStorage.getItem('latest_prediction');
+                if (cachedPred && adminChartInstance) {
                     const parsed = JSON.parse(cachedPred);
                     createAdminChart(parsed.predicted_prices);
-                } catch(e) { console.error(e); }
+                }
+            });
+
+            /* === STATUS SYNCHRONIZATION === */
+            const status = localStorage.getItem('model_status') || 'needs_data';
+            const uiHead = document.getElementById('modelStatusUI');
+            if (status === 'trained') {
+                uiHead.innerHTML = '<span class="badge badge-success">Online & Ready</span>';
+            } else if (status === 'uploaded') {
+                uiHead.innerHTML = '<span class="badge badge-warning">Needs Optimization</span>';
+            } else {
+                uiHead.innerHTML = '<span class="badge badge-danger">Offline</span>';
             }
-        });
-    </script>
-</body>
+
+            async function trainModel(btnRef) {
+                if (!confirm('This will trigger a full matrix recalibration. Proceed?')) return;
+
+                const original = btnRef.textContent;
+                btnRef.innerHTML = `Calibrating <div class="spinner"></div>`;
+                btnRef.disabled = true;
+
+                try {
+                    const response = await fetch('/train/', { method: 'POST' });
+                    const result = await response.json();
+
+                    if (result.error) {
+                        alert('❌ Sequence Failed: ' + result.error);
+                    } else {
+                        localStorage.setItem('model_status', 'trained');
+                        localStorage.removeItem('latest_prediction');
+                        alert('✅ ' + result.message);
+                        location.reload();
+                    }
+                } catch (error) {
+                    alert('❌ Connection Error: ' + error.message);
+                } finally {
+                    btnRef.textContent = original;
+                    btnRef.disabled = false;
+                }
+            }
+
+            function clearData() {
+                alert('⚠️ To delete all data, use the per-file 🗑 Delete buttons in the Ingested Datasets table above.');
+            }
+
+            /* === LOAD METRICS FROM API === */
+            async function loadAdminMetrics() {
+                try {
+                    const resp = await fetch('/metrics/');
+                    const m = await resp.json();
+                    if (!m.error) {
+                        document.getElementById('adminMAE').textContent  = parseFloat(m.MAE).toFixed(2);
+                        document.getElementById('adminRMSE').textContent = parseFloat(m.RMSE).toFixed(2);
+                        document.getElementById('adminMAPE').textContent = parseFloat(m.MAPE).toFixed(2);
+                    } else {
+                        ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
+                            document.getElementById(id).textContent = 'N/A'
+                        );
+                    }
+                } catch {
+                    ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
+                        document.getElementById(id).textContent = 'Error'
+                    );
+                }
+            }
+
+            /* === ADMIN FORECAST GRAPH SYNCHRONIZATION === */
+            let adminChartInstance = null;
+
+            function createAdminChart(prices) {
+                document.getElementById('adminPlaceholder').style.display = 'none';
+                document.getElementById('adminChartContainer').style.display = 'flex';
+
+                const ctx = document.getElementById('adminForecastChart').getContext('2d');
+                if (adminChartInstance) adminChartInstance.destroy();
+
+                const labels = prices.map((_, i) => `Month ${i + 1}`);
+                
+                const theme = document.documentElement.getAttribute('data-theme');
+                const style = getComputedStyle(document.body);
+                const textColor = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
+                const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.1)' : (style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)');
+                const accentColor = style.getPropertyValue('--accent').trim() || '#10b981';
+
+                const fuelColor = style.getPropertyValue('--chart-accent').trim() || '#10b981';
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                const r = parseInt(fuelColor.slice(1,3), 16) || 99;
+                const g = parseInt(fuelColor.slice(3,5), 16) || 102;
+                const b = parseInt(fuelColor.slice(5,7), 16) || 241;
+                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
+
+                setTimeout(() => {
+                    adminChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Projected Value Overview',
+                                data: prices,
+                                borderColor: fuelColor,
+                                backgroundColor: gradient,
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 4,
+                                pointBackgroundColor: fuelColor,
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            color: textColor,
+                            plugins: {
+                                legend: { display: true, labels: { color: textColor, font: { family: 'Lexend', size: 12, weight: '600' } } },
+                                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
+                            },
+                            scales: {
+                                y: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { color: gridColor, drawBorder: false } },
+                                x: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { display: false } }
+                            }
+                        }
+                    });
+                }, 10);
+            }
+
+            window.addEventListener('DOMContentLoaded', () => {
+                loadAdminMetrics();
+                const cachedPred = localStorage.getItem('latest_prediction');
+                if (cachedPred) {
+                    try {
+                        const parsed = JSON.parse(cachedPred);
+                        createAdminChart(parsed.predicted_prices);
+                    } catch(e) { console.error(e); }
+                }
+            });
+        </script>
+    </body>
 </html>

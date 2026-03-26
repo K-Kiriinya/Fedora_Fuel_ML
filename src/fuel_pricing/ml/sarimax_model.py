@@ -22,8 +22,8 @@ from pathlib import Path
 
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
-
 from fuel_pricing.core.config import PROCESSED_DIR
+
 MODEL_PATH = PROCESSED_DIR / "sarimax_model.pkl"
 METRICS_PATH = PROCESSED_DIR / "metrics.pkl"
 
@@ -44,7 +44,9 @@ class FuelSARIMAXModel:
     # --------------------------
     # STEP 1: LOAD & MERGE DATA
     # --------------------------
-    def prepare_dataset(self, price_df: pd.DataFrame, shock_df: pd.DataFrame) -> pd.DataFrame:
+    def prepare_dataset(
+        self, price_df: pd.DataFrame, shock_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Merge price data with exogenous shock variables.
 
@@ -123,7 +125,7 @@ class FuelSARIMAXModel:
         self.metrics = {
             "MAE": round(float(mae), 4),
             "RMSE": round(float(rmse), 4),
-            "MAPE": round(float(mape), 4)
+            "MAPE": round(float(mape), 4),
         }
 
         return self.metrics
@@ -174,7 +176,7 @@ class FuelSARIMAXModel:
             order=(1, 1, 1),
             seasonal_order=(1, 1, 1, 12),
             enforce_stationarity=False,
-            enforce_invertibility=False
+            enforce_invertibility=False,
         )
 
         # Fit model
@@ -184,10 +186,7 @@ class FuelSARIMAXModel:
         joblib.dump(self.results, MODEL_PATH)
 
         # Forecast test period
-        forecast = self.results.get_forecast(
-            steps=len(y_test),
-            exog=exog_test
-        )
+        forecast = self.results.get_forecast(steps=len(y_test), exog=exog_test)
 
         predictions = forecast.predicted_mean
 
@@ -228,9 +227,7 @@ class FuelSARIMAXModel:
         """
 
         if not MODEL_PATH.exists():
-            raise FileNotFoundError(
-                "Model file not found. Train the model first."
-            )
+            raise FileNotFoundError("Model file not found. Train the model first.")
 
         # Load saved model
         self.results = joblib.load(MODEL_PATH)
@@ -238,10 +235,7 @@ class FuelSARIMAXModel:
         # Create features for future exogenous data
         future_exog = self.create_features(future_exog)
 
-        forecast = self.results.get_forecast(
-            steps=steps,
-            exog=future_exog
-        )
+        forecast = self.results.get_forecast(steps=steps, exog=future_exog)
 
         conf_int = forecast.conf_int()
 

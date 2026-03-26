@@ -1,15 +1,15 @@
 import pandas as pd
 
-def load_and_prepare(path: str):
 
+def load_and_prepare(path: str):
     """
     Loads CSV and prepares it for SARI0MAX.
 
     Steps:
-    1. Read CSV
-    2. Convert 'date' to datetime
-    3. Sort chronologically
-    4. Set date as index (required for time series)
+    1. Reads CSV
+    2. Converts 'date' to datetime
+    3. Sorts chronologically
+    4. Sets date as index (required for time series)
     """
 
     df = pd.read_csv(path)
