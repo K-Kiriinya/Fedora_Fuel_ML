@@ -7,24 +7,89 @@
     <title>Admin Dashboard - Fedora Fuel ML</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* ── Tabbed Params Panel ── */
+        .param-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+        .param-tab {
+            padding: 6px 14px; border-radius: 20px; border: 1px solid var(--card-border);
+            background: var(--mesh-bg); color: var(--text-secondary);
+            cursor: pointer; font-size: 0.8em; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .param-tab.active {
+            background: var(--accent); color: var(--card-bg); border-color: var(--accent);
+        }
+        .param-page { display: none; }
+        .param-page.active { display: block; }
 
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .info-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .info-item label {
+            font-size: 0.68em;
+            font-weight: 700;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .info-item span {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: var(--text-primary);
+            word-break: break-all;
+        }
+        .info-item.full-width { grid-column: span 2; }
+        .info-item .tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+        .tag {
+            background: rgba(16,185,129,0.1);
+            color: var(--accent);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        [data-theme='dark'] .tag { background: rgba(52,211,153,0.08); }
+
+        .section-title {
+            font-size: 0.75em;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 14px 0 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--card-border);
+        }
+    </style>
 </head>
     <body>
         <div class="container">
-            <!-- Top Controls: Theme Toggle -->
+            <!-- Top Controls: Dark Mode first, Back to Engine second -->
             <div class="top-controls">
-                <a href="/" class="back-link">← Back to Engine</a>
-                <button class="theme-toggle" id="themeToggle" title="Toggle Dark Mode">
-                    <span id="themeIcon">🌙</span> <span class="text">Dark Mode</span>
+                <button class="theme-toggle" id="themeToggle" title="Toggle Theme">
+                    <span id="themeIcon">🌙</span> <span class="text" id="themeLabel">Dark Mode</span>
                 </button>
+                <a href="/" class="back-link">← Back to Engine</a>
             </div>
 
             <div class="header">
                 <h1>⚙️ Central Command</h1>
-                <p>System Overview & Data Registry</p>
+                <p>System Overview &amp; Data Registry</p>
             </div>
 
-            <!-- Statistics Row Constraint -->
+            <!-- Statistics Row -->
             <div class="stats">
                 <div class="stat-box">
                     <h3>{{ files|length }}</h3>
@@ -42,7 +107,7 @@
                 </div>
             </div>
 
-            <!-- 2 Column Layout Constraint -->
+            <!-- 2 Column Layout -->
             <div class="admin-grid">
                 
                 <!-- Left Panel -->
@@ -99,70 +164,226 @@
                     </div>
                 </div>
 
-                <!-- Right Panel -->
+                <!-- Right Panel: Predictive Parameters (tabbed) -->
                 <div class="card" style="display: flex; flex-direction: column; overflow: hidden;">
                     <h2>🤖 Predictive Parameters</h2>
-                    <div class="model-info table-wrapper" style="margin-top: 5px;">
+
+                    <!-- Tab Nav -->
+                    <div class="param-tabs">
+                        <button class="param-tab active" onclick="showTab('tab-model', this)">Model Config</button>
+                        <button class="param-tab" onclick="showTab('tab-features', this)">Feature Engineering</button>
+                        <button class="param-tab" onclick="showTab('tab-data', this)">Data Pipeline</button>
+                        <button class="param-tab" onclick="showTab('tab-metrics', this)">Accuracy Metrics</button>
+                        <button class="param-tab" onclick="showTab('tab-forecast', this)">Forecast Sync</button>
+                    </div>
+
+                    <!-- Page 1: Model Config -->
+                    <div class="param-page active" id="tab-model">
+                        <p class="section-title">SARIMAX Architecture</p>
                         <div class="info-grid">
                             <div class="info-item">
-                                <label>Order (p, d, q)</label>
+                                <label>AR Order (p)</label>
+                                <span>1 — Autoregressive lag</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Differencing (d)</label>
+                                <span>1 — First-order integration</span>
+                            </div>
+                            <div class="info-item">
+                                <label>MA Order (q)</label>
+                                <span>1 — Moving average window</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Full Order (p,d,q)</label>
                                 <span>(1, 1, 1)</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Seasonal Topology</label>
-                                <span>(1, 1, 1, 12)</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Temporal Cycles</label>
-                                <span>12 months</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Validation Split</label>
-                                <span>20% Holdout</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Exogenous Shocks</label>
-                                <span>Enabled / Monitored</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Memory Path</label>
-                                <span style="word-break: break-all;">data/processed/sarimax_model.pkl</span>
                             </div>
                         </div>
 
-                        <!-- Live Model Accuracy Metrics -->
-                        <div style="margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 14px;">
-                            <h2 style="font-size: 1em; margin-bottom: 10px;">📊 Model Accuracy</h2>
-                            <div id="adminMetricsGrid" class="metrics-mini">
-                                <div class="metric-card">
-                                    <span class="metric-label">MAE</span>
-                                    <span class="metric-value" id="adminMAE">—</span>
-                                    <span class="metric-unit">KES</span>
-                                </div>
-                                <div class="metric-card">
-                                    <span class="metric-label">RMSE</span>
-                                    <span class="metric-value" id="adminRMSE">—</span>
-                                    <span class="metric-unit">KES</span>
-                                </div>
-                                <div class="metric-card">
-                                    <span class="metric-label">MAPE</span>
-                                    <span class="metric-value" id="adminMAPE">—</span>
-                                    <span class="metric-unit">%</span>
-                                </div>
+                        <p class="section-title">Seasonal Configuration</p>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Seasonal AR (P)</label>
+                                <span>1</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Seasonal Diff (D)</label>
+                                <span>1</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Seasonal MA (Q)</label>
+                                <span>1</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Period (m)</label>
+                                <span>12 months — Annual cycle</span>
+                            </div>
+                            <div class="info-item full-width">
+                                <label>Seasonal Topology</label>
+                                <span>(P=1, D=1, Q=1, m=12)</span>
+                            </div>
+                        </div>
+
+                        <p class="section-title">Optimization Constraints</p>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Enforce Stationarity</label>
+                                <span>Disabled — Relaxed</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Enforce Invertibility</label>
+                                <span>Disabled — Relaxed</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Fitting Method</label>
+                                <span>MLE via L-BFGS-B</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Display Convergence</label>
+                                <span>Suppressed (disp=False)</span>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Latest User Forecast Graph -->
-                    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-top: 15px; border-top: 1px solid var(--card-border); padding-top: 15px;">
+
+                    <!-- Page 2: Feature Engineering -->
+                    <div class="param-page" id="tab-features">
+                        <p class="section-title">Engineered Features</p>
+                        <div class="info-grid">
+                            <div class="info-item full-width">
+                                <label>FX Shock Interaction</label>
+                                <span>pipeline_burst × exchange_rate_usd_ksh</span>
+                                <div class="tag-list">
+                                    <span class="tag">Non-linear</span>
+                                    <span class="tag">Conditional</span>
+                                </div>
+                            </div>
+                            <div class="info-item full-width">
+                                <label>Inflation–Shortage Interaction</label>
+                                <span>fuel_shortage × inflation_rate</span>
+                                <div class="tag-list">
+                                    <span class="tag">Cross-variable</span>
+                                    <span class="tag">Shock Amplifier</span>
+                                </div>
+                            </div>
+                            <div class="info-item full-width">
+                                <label>Log Transport Cost</label>
+                                <span>log1p(transport_cost_index)</span>
+                                <div class="tag-list">
+                                    <span class="tag">Normalizing</span>
+                                    <span class="tag">Log-transformed</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="section-title">Exogenous Shock Variables</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>Crude Oil Price</label><span>crude_price (USD/bbl)</span></div>
+                            <div class="info-item"><label>Exchange Rate</label><span>exchange_rate (KES/USD)</span></div>
+                            <div class="info-item"><label>Inflation Rate</label><span>inflation (% MoM)</span></div>
+                            <div class="info-item"><label>Pipeline Events</label><span>pipeline_burst (binary)</span></div>
+                            <div class="info-item"><label>Supply Disruption</label><span>fuel_shortage (binary)</span></div>
+                            <div class="info-item"><label>Transport Index</label><span>transport_cost_index</span></div>
+                        </div>
+
+                        <p class="section-title">Fuel Target Aliases</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>PMS (Petrol)</label><span>Super (PMS) / Super / Petrol</span></div>
+                            <div class="info-item"><label>AGO (Diesel)</label><span>Diesel (AGO) / Diesel / AGO</span></div>
+                            <div class="info-item"><label>IK (Kerosene)</label><span>Kerosene (IK) / Kerosene / IK</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 3: Data Pipeline -->
+                    <div class="param-page" id="tab-data">
+                        <p class="section-title">Primary Data Sources</p>
+                        <div class="info-grid">
+                            <div class="info-item full-width">
+                                <label>Priority Dataset (User Uploads)</label>
+                                <span style="word-break:break-all">data/uploads/*.csv</span>
+                                <div class="tag-list"><span class="tag">User-supplied</span><span class="tag">Highest priority</span></div>
+                            </div>
+                            <div class="info-item full-width">
+                                <label>Fallback Dataset (2026 Regulatory)</label>
+                                <span style="word-break:break-all">data/processed/local_prices/EPRA_Pump_Prices.csv</span>
+                                <div class="tag-list"><span class="tag">3,793 rows</span><span class="tag">Multi-town</span><span class="tag">Auto-used if no uploads</span></div>
+                            </div>
+                            <div class="info-item full-width">
+                                <label>Last Resort</label>
+                                <span style="word-break:break-all">data/processed/local_prices/kenyan_oil_prices_monthly_clean.csv</span>
+                            </div>
+                        </div>
+
+                        <p class="section-title">Supported Date Formats (Ingestion)</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>Format 1</label><span>DD-MM-YYYY (e.g. 15-03-2026)</span></div>
+                            <div class="info-item"><label>Format 2</label><span>DDMMYY (e.g. 150326)</span></div>
+                            <div class="info-item"><label>Format 3</label><span>YYMMDD (e.g. 260315)</span></div>
+                            <div class="info-item"><label>Format 4</label><span>15th April 26 (ordinal)</span></div>
+                            <div class="info-item"><label>Format 5</label><span>YYYY-MM-DD ISO 8601</span></div>
+                        </div>
+
+                        <p class="section-title">Model Persistence</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>PMS Model Path</label><span style="word-break:break-all">data/processed/sarimax_model_pms.pkl</span></div>
+                            <div class="info-item"><label>AGO Model Path</label><span style="word-break:break-all">data/processed/sarimax_model_ago.pkl</span></div>
+                            <div class="info-item"><label>IK Model Path</label><span style="word-break:break-all">data/processed/sarimax_model_ik.pkl</span></div>
+                            <div class="info-item"><label>Serialisation</label><span>joblib (binary pickle)</span></div>
+                        </div>
+
+                        <p class="section-title">Preprocessing Pipeline</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>Resampling</label><span>Monthly mean (MS freq)</span></div>
+                            <div class="info-item"><label>Missing Values</label><span>ffill → bfill → dropna</span></div>
+                            <div class="info-item"><label>NaN Safety</label><span>Infinite/NaN → 0.0 (JSON)</span></div>
+                            <div class="info-item"><label>Market Indicators</label><span>Auto-merged from processed/market_indicators/*.csv</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 4: Accuracy Metrics -->
+                    <div class="param-page" id="tab-metrics">
+                        <p class="section-title">Train/Validation Split</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>Train Set</label><span>80% of historical data</span></div>
+                            <div class="info-item"><label>Test Set</label><span>20% holdout</span></div>
+                            <div class="info-item full-width"><label>Refit Strategy</label><span>Full-data refit after evaluation — production model uses 100% of data</span></div>
+                        </div>
+
+                        <p class="section-title">Live Model Accuracy — Petrol (PMS)</p>
+                        <div class="metrics-mini" id="adminMetricsPMS" style="margin-bottom: 14px;">
+                            <div class="metric-card"><span class="metric-label">MAE</span><span class="metric-value" id="adminMAE">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">RMSE</span><span class="metric-value" id="adminRMSE">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">MAPE</span><span class="metric-value" id="adminMAPE">—</span><span class="metric-unit">%</span></div>
+                        </div>
+
+                        <p class="section-title">Live Model Accuracy — Diesel (AGO)</p>
+                        <div class="metrics-mini" id="adminMetricsAGO" style="margin-bottom: 14px;">
+                            <div class="metric-card"><span class="metric-label">MAE</span><span class="metric-value" id="adminMAE_ago">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">RMSE</span><span class="metric-value" id="adminRMSE_ago">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">MAPE</span><span class="metric-value" id="adminMAPE_ago">—</span><span class="metric-unit">%</span></div>
+                        </div>
+
+                        <p class="section-title">Live Model Accuracy — Kerosene (IK)</p>
+                        <div class="metrics-mini" id="adminMetricsIK">
+                            <div class="metric-card"><span class="metric-label">MAE</span><span class="metric-value" id="adminMAE_ik">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">RMSE</span><span class="metric-value" id="adminRMSE_ik">—</span><span class="metric-unit">KES</span></div>
+                            <div class="metric-card"><span class="metric-label">MAPE</span><span class="metric-value" id="adminMAPE_ik">—</span><span class="metric-unit">%</span></div>
+                        </div>
+
+                        <p class="section-title">Metric Definitions</p>
+                        <div class="info-grid">
+                            <div class="info-item"><label>MAE</label><span>Mean Absolute Error — average KES deviation per month</span></div>
+                            <div class="info-item"><label>RMSE</label><span>Root Mean Squared Error — penalises large outlier errors</span></div>
+                            <div class="info-item full-width"><label>MAPE</label><span>Mean Absolute Percentage Error — scale-independent accuracy (%)</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Page 5: Forecast Sync -->
+                    <div class="param-page" id="tab-forecast" style="display: none; flex-direction: column; flex: 1;">
                         <h2 style="font-size: 1.1em; margin-bottom: 10px;">📉 Latest User Forecast Sync</h2>
-                        
-                        <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center;">
+                        <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center; min-height: 350px;">
                             <span style="font-size: 2em; margin-bottom: 10px;">💤</span>
                             <span style="font-size: 0.9em;">No cached forecast available.<br>Switch to Engine to run one.</span>
                         </div>
-
-                        <div id="adminChartContainer" style="display: none; flex: 1; min-height: 0; position: relative;">
+                        <div id="adminChartContainer" style="display: none; flex: 1; min-height: 350px; position: relative;">
                             <canvas id="adminForecastChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
                         </div>
                     </div>
@@ -172,27 +393,50 @@
         </div>
 
         <script>
+            /* === TAB NAVIGATION === */
+            function showTab(tabId, btn) {
+                document.querySelectorAll('.param-page').forEach(p => {
+                    p.style.display = 'none';
+                    p.classList.remove('active');
+                });
+                document.querySelectorAll('.param-tab').forEach(t => t.classList.remove('active'));
+                const target = document.getElementById(tabId);
+                target.style.display = tabId === 'tab-forecast' ? 'flex' : 'block';
+                target.classList.add('active');
+                btn.classList.add('active');
+
+                // Render chart if switching to forecast tab
+                if (tabId === 'tab-forecast') {
+                    const cachedPred = localStorage.getItem('latest_prediction');
+                    if (cachedPred && !adminChartInstance) {
+                        createAdminChart(JSON.parse(cachedPred));
+                    }
+                }
+            }
+
             /* === THEME SYNCHRONIZATION === */
             const themeToggle = document.getElementById('themeToggle');
-            const themeIcon = document.getElementById('themeIcon');
+            const themeIcon   = document.getElementById('themeIcon');
+            const themeLabel  = document.getElementById('themeLabel');
             const htmlElement = document.documentElement;
 
+            function applyTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                themeIcon.textContent  = theme === 'dark' ? '☀️' : '🌙';
+                themeLabel.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            }
+
             const storedTheme = localStorage.getItem('theme') || 'light';
-            htmlElement.setAttribute('data-theme', storedTheme);
-            themeIcon.textContent = storedTheme === 'dark' ? '☀️' : '🌙';
+            applyTheme(storedTheme);
 
             themeToggle.addEventListener('click', () => {
                 const currentTheme = htmlElement.getAttribute('data-theme');
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                htmlElement.setAttribute('data-theme', newTheme);
                 localStorage.setItem('theme', newTheme);
-                themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-                
-                // Re-render chart softly to match new theme if present
-                const cachedPred = localStorage.getItem('latest_prediction');
-                if (cachedPred && adminChartInstance) {
-                    const parsed = JSON.parse(cachedPred);
-                    createAdminChart(parsed.predicted_prices);
+                applyTheme(newTheme);
+                if (adminChartInstance) {
+                    const cachedPred = localStorage.getItem('latest_prediction');
+                    if (cachedPred) createAdminChart(JSON.parse(cachedPred));
                 }
             });
 
@@ -209,15 +453,14 @@
 
             async function trainModel(btnRef) {
                 if (!confirm('This will trigger a full matrix recalibration. Proceed?')) return;
-
                 const original = btnRef.textContent;
                 btnRef.innerHTML = `Calibrating <div class="spinner"></div>`;
                 btnRef.disabled = true;
-
                 try {
-                    const response = await fetch('/train/', { method: 'POST' });
+                    const fd = new FormData();
+                    fd.append('town', 'Nairobi');
+                    const response = await fetch('/train/', { method: 'POST', body: fd });
                     const result = await response.json();
-
                     if (result.error) {
                         alert('❌ Sequence Failed: ' + result.error);
                     } else {
@@ -234,88 +477,89 @@
                 }
             }
 
-            function clearData() {
-                alert('⚠️ To delete all data, use the per-file 🗑 Delete buttons in the Ingested Datasets table above.');
-            }
-
-            /* === LOAD METRICS FROM API === */
+            /* === LOAD METRICS FROM API — ALL 3 FUELS === */
             async function loadAdminMetrics() {
-                try {
-                    const resp = await fetch('/metrics/');
-                    const m = await resp.json();
-                    if (!m.error) {
-                        document.getElementById('adminMAE').textContent  = parseFloat(m.MAE).toFixed(2);
-                        document.getElementById('adminRMSE').textContent = parseFloat(m.RMSE).toFixed(2);
-                        document.getElementById('adminMAPE').textContent = parseFloat(m.MAPE).toFixed(2);
-                    } else {
-                        ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
-                            document.getElementById(id).textContent = 'N/A'
-                        );
+                const fuels = ['pms', 'ago', 'ik'];
+                const idMap = {
+                    pms: ['adminMAE', 'adminRMSE', 'adminMAPE'],
+                    ago: ['adminMAE_ago', 'adminRMSE_ago', 'adminMAPE_ago'],
+                    ik:  ['adminMAE_ik',  'adminRMSE_ik',  'adminMAPE_ik']
+                };
+                for (const fuel of fuels) {
+                    try {
+                        const resp = await fetch(`/metrics/?fuel_type=${fuel}`);
+                        const m = await resp.json();
+                        const [maeId, rmseId, mapeId] = idMap[fuel];
+                        if (!m.error) {
+                            document.getElementById(maeId).textContent  = parseFloat(m.MAE).toFixed(2);
+                            document.getElementById(rmseId).textContent = parseFloat(m.RMSE).toFixed(2);
+                            document.getElementById(mapeId).textContent = parseFloat(m.MAPE).toFixed(2);
+                        } else {
+                            [maeId, rmseId, mapeId].forEach(id => document.getElementById(id).textContent = 'N/A');
+                        }
+                    } catch {
+                        const [maeId, rmseId, mapeId] = idMap[fuel];
+                        [maeId, rmseId, mapeId].forEach(id => document.getElementById(id).textContent = 'Err');
                     }
-                } catch {
-                    ['adminMAE','adminRMSE','adminMAPE'].forEach(id =>
-                        document.getElementById(id).textContent = 'Error'
-                    );
                 }
             }
 
-            /* === ADMIN FORECAST GRAPH SYNCHRONIZATION === */
+            /* === ADMIN FORECAST CHART — MULTI-FUEL === */
             let adminChartInstance = null;
 
-            function createAdminChart(prices) {
+            function createAdminChart(result) {
                 document.getElementById('adminPlaceholder').style.display = 'none';
                 document.getElementById('adminChartContainer').style.display = 'flex';
 
                 const ctx = document.getElementById('adminForecastChart').getContext('2d');
                 if (adminChartInstance) adminChartInstance.destroy();
 
-                const labels = prices.map((_, i) => `Month ${i + 1}`);
-                
-                const theme = document.documentElement.getAttribute('data-theme');
-                const style = getComputedStyle(document.body);
-                const textColor = theme === 'dark' ? '#f8f8f8' : (style.getPropertyValue('--text-primary').trim() || '#1e293b');
-                const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.1)' : (style.getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.05)');
-                const accentColor = style.getPropertyValue('--accent').trim() || '#10b981';
+                const theme = htmlElement.getAttribute('data-theme');
+                const textColor = theme === 'dark' ? '#f8f8f8' : '#1e293b';
+                const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
 
-                const fuelColor = style.getPropertyValue('--chart-accent').trim() || '#10b981';
-
-                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                const r = parseInt(fuelColor.slice(1,3), 16) || 99;
-                const g = parseInt(fuelColor.slice(3,5), 16) || 102;
-                const b = parseInt(fuelColor.slice(5,7), 16) || 241;
-                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.5)`);
-                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
+                const labels = result.date_labels || (result.pms && result.pms.prices
+                    ? result.pms.prices.map((_, i) => `Month ${i+1}`) : []);
 
                 setTimeout(() => {
                     adminChartInstance = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Projected Value Overview',
-                                data: prices,
-                                borderColor: fuelColor,
-                                backgroundColor: gradient,
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 4,
-                                pointBackgroundColor: fuelColor,
-                                pointBorderColor: '#fff',
-                                pointBorderWidth: 2
-                            }]
+                            labels,
+                            datasets: [
+                                {
+                                    label: 'Petrol (PMS)',
+                                    data: result.pms ? result.pms.prices : [],
+                                    borderColor: '#ef4444', backgroundColor: 'transparent',
+                                    borderWidth: 2.5, tension: 0.35, pointRadius: 3
+                                },
+                                {
+                                    label: 'Diesel (AGO)',
+                                    data: result.ago ? result.ago.prices : [],
+                                    borderColor: '#f59e0b', backgroundColor: 'transparent',
+                                    borderWidth: 2.5, tension: 0.35, pointRadius: 3
+                                },
+                                {
+                                    label: 'Kerosene (IK)',
+                                    data: result.ik ? result.ik.prices : [],
+                                    borderColor: '#38bdf8', backgroundColor: 'transparent',
+                                    borderWidth: 2.5, tension: 0.35, pointRadius: 3
+                                }
+                            ]
                         },
                         options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            color: textColor,
+                            responsive: true, maintainAspectRatio: false, color: textColor,
+                            interaction: { intersect: false, mode: 'index' },
                             plugins: {
-                                legend: { display: true, labels: { color: textColor, font: { family: 'Lexend', size: 12, weight: '600' } } },
-                                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)' }
+                                legend: { display: true, labels: { color: textColor, font: { family: 'Lexend', size: 11 } } },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15,23,42,0.9)',
+                                    callbacks: { label: c => ` ${c.dataset.label}: KES ${c.parsed.y.toFixed(2)}` }
+                                }
                             },
                             scales: {
-                                y: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { color: gridColor, drawBorder: false } },
-                                x: { ticks: { color: textColor, font: { family: 'Lexend', size: 10 } }, grid: { display: false } }
+                                y: { ticks: { color: textColor, callback: v => 'KES ' + v }, grid: { color: gridColor } },
+                                x: { ticks: { color: textColor }, grid: { display: false } }
                             }
                         }
                     });
@@ -326,10 +570,7 @@
                 loadAdminMetrics();
                 const cachedPred = localStorage.getItem('latest_prediction');
                 if (cachedPred) {
-                    try {
-                        const parsed = JSON.parse(cachedPred);
-                        createAdminChart(parsed.predicted_prices);
-                    } catch(e) { console.error(e); }
+                    try { createAdminChart(JSON.parse(cachedPred)); } catch(e) {}
                 }
             });
         </script>

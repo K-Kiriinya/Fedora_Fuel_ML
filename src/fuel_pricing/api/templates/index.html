@@ -144,14 +144,14 @@
                     </div>
 
                     <!-- Historical Comparison Card -->
-                    <div class="card" id="historyCard" style="min-height: 75vh; margin-top: 20px; overflow: hidden; display: flex;">
+                    <div class="card" id="historyCard" style="min-height: 90vh; margin-top: 20px; overflow: hidden; display: flex;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h2 style="margin: 0;">📜 Fuel Market Pulse </h2>
                             <select id="townSelect" style="padding: 8px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); font-family: 'Lexend', sans-serif;">
                                 <option value="Nairobi">Nairobi</option>
                             </select>
                         </div>
-                        <div style="flex: 1; min-height: 500px; position: relative;">
+                        <div style="flex: 1; min-height: 700px; position: relative;">
                             <canvas id="historyChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
                         </div>
                     </div>
@@ -186,12 +186,8 @@
                 const cachedPred = localStorage.getItem('latest_prediction');
                 if (cachedPred && forecastChartInstance) {
                     const p = JSON.parse(cachedPred);
-                    createForecastChart(
-                        p.predicted_prices,
-                        p.lower_ci   || [],
-                        p.upper_ci   || [],
-                        p.date_labels || null
-                    );
+                    // Re-render using current multi-fuel format
+                    createForecastChart(p);
                 }
 
                 // Update history chart colors without re-fetching
@@ -622,7 +618,9 @@
                                     color: textColor, 
                                     font: { size: 10.5 }, 
                                     autoSkip: true, 
-                                    maxTicksLimit: 10 
+                                    maxRotation: 45,
+                                    minRotation: 30,
+                                    maxTicksLimit: 24 
                                 }, 
                                 grid: { display: false },
                                 border: { color: gridColor }

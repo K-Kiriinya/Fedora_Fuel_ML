@@ -254,26 +254,27 @@ def flexible_date_parse(date_val):
 
 def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataFrame:
     """
-    Dynamically loads and merges all available processed datasets.
+    Dynamically loads datasets with strict priority:
+    1. User Uploads (UPLOAD_DIR)
+    2. EPRA Regulatory Fallback (EPRA_Pump_Prices.csv)
+    3. Last Resort (kenyan_oil_prices_monthly_clean.csv)
     """
-    # 1. Check for manual uploads (user-uploaded custom data)
+    # 1. PRIORITY: Check for manual uploads (user-uploaded custom data)
     csv_files = list(UPLOAD_DIR.glob("*.csv"))
-    # We only use uploads if they are explicitly the goal, but for the default 2026 logic,
-    # we should check if the user just uploaded something.
-    # To be safe and follow user's request, we prioritize the main EPRA databank.
-
-    # 2. Main dataset (local_prices)
-    prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
-    if not prices_file.exists():
-        prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
-
-    if not prices_file.exists():
-         # Last resort: use upload if available
-         if csv_files:
-             df = pd.read_csv(csv_files[0])
-         else:
-             raise Exception("System Error: Historical dataset missing.")
+    if csv_files:
+        # Use the most recently uploaded file
+        csv_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        df = pd.read_csv(csv_files[0])
     else:
+        # 2. FALLBACK: Main regulatory dataset
+        prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
+        if not prices_file.exists():
+            # 3. LAST RESORT
+            prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+
+        if not prices_file.exists():
+            raise Exception("System Error: No historical or uploaded datasets found.")
+        
         df = pd.read_csv(prices_file)
 
     # Filter for selected town
@@ -631,13 +632,15 @@ def purge_all_files(
 
 @app.get("/towns/")
 def get_towns():
-    """Returns a list of all available towns in the historical dataset."""
+    """Returns a list of all available towns from the official regulatory fallback."""
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
             prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+        
         if not prices_file.exists():
             return {"error": "Historical data file not found."}
+
         df = pd.read_csv(prices_file)
         if "Town" not in df.columns:
             return {"towns": []}
@@ -652,57 +655,60 @@ def get_towns():
 @app.get("/history/")
 def get_history_data(town: str = "Nairobi"):
     """
-    Returns historical price data for Petrol (PMS), Diesel (AGO), and Kerosene (Kero).
-    Uses the provided town's prices from EPRA_Pump_Prices.csv to show monthly data.
+    Returns historical price data for visualization using the official regulatory databank.
     """
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
             prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+        
         if not prices_file.exists():
-            return {"error": "Historical data file not found."}
+            return {"error": "Historical repository missing."}
 
         df = pd.read_csv(prices_file)
 
         # Filter for the chosen town
         if "Town" in df.columns:
-            df = df[df["Town"].str.strip().str.lower() == town.lower()]
+            # Handle case-insensitive town filtering safely
+            df["_town_clean"] = df["Town"].astype(str).str.strip().str.lower()
+            df = df[df["_town_clean"] == town.lower()]
 
-        # Extract monthly dates from the 'To' column to show full cycle history
-        if "To" in df.columns:
-            df["month"] = df["To"].apply(flexible_date_parse)
-        elif "From" in df.columns:
-            df["month"] = df["From"].apply(flexible_date_parse)
-        elif "date" in df.columns:
-            df["month"] = df["date"].apply(flexible_date_parse)
-        else:
+        # Identify date column
+        # Priority: To > From > date > timestamp
+        date_col = None
+        for col in ["To", "From", "date", "timestamp", "Period"]:
+            if col in df.columns:
+                date_col = col
+                break
+        
+        if not date_col:
             return {"error": "Time column not found in dataset."}
 
+        df["month"] = df[date_col].apply(flexible_date_parse)
+        df = df[df["month"].notna()] # Drop NaT to avoid crash
         df.sort_values("month", inplace=True)
+
+        if df.empty:
+            return {"labels": [], "pms": [], "ago": [], "kero": []}
 
         # Prepare labels and values
         labels = [d.strftime("%b %Y") for d in df["month"]]
 
-        # Map actual columns to model names
-        if "Super (PMS)" in df.columns:
-            df.rename(columns={"Super (PMS)": "PMS", "Diesel (AGO)": "AGO", "Kerosene (IK)": "Kero"}, inplace=True)
+        # --- Robust Fuel Column Mapping (Fuzzy) ---
+        pms_col = next((c for c in df.columns if any(p in c.upper() for p in ["PMS", "PETROL", "SUPER"])), None)
+        ago_col = next((c for c in df.columns if any(a in c.upper() for a in ["AGO", "DIESEL"])), None)
+        kero_col = next((c for c in df.columns if any(k in c.upper() for k in ["IK", "KERO"])), None)
 
-        # Clean NaN values for JSON safety
-        pms_values = (
-            df["PMS"].ffill().bfill().round(2).tolist() if "PMS" in df.columns else []
-        )
-        ago_values = (
-            df["AGO"].ffill().bfill().round(2).tolist() if "AGO" in df.columns else []
-        )
-        kero_values = (
-            df["Kero"].ffill().bfill().round(2).tolist() if "Kero" in df.columns else []
-        )
+        def clean_series(col_name):
+            if col_name and col_name in df.columns:
+                return df[col_name].ffill().bfill().round(2).fillna(0).tolist()
+            return []
 
         return {
             "labels": labels,
-            "pms": pms_values,
-            "ago": ago_values,
-            "kero": kero_values,
+            "pms": clean_series(pms_col),
+            "ago": clean_series(ago_col),
+            "kero": clean_series(kero_col),
         }
     except Exception as e:
         logger.error(f"History data error: {str(e)}")
