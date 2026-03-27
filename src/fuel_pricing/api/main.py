@@ -210,7 +210,7 @@ async def upload_file(file: UploadFile = File(...)):
         return {"error": f"Upload failed: {str(e)}"}
 
 
-def get_training_data() -> pd.DataFrame:
+def get_training_data(town: str = "Nairobi") -> pd.DataFrame:
     """
     Dynamically loads and merges all available processed datasets.
     """
@@ -224,21 +224,34 @@ def get_training_data() -> pd.DataFrame:
             return df
 
     # 2. Main dataset (local_prices)
-    prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+    prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
     if not prices_file.exists():
         raise Exception("System Error: Default Processed local prices dataset missing.")
 
     df = pd.read_csv(prices_file)
 
-    if "Local Price in KSH" in df.columns:
+    # Filter for selected town
+    if "Town" in df.columns:
+        df = df[df["Town"].str.strip().str.lower() == town.lower()]
+
+    if "Super (PMS)" in df.columns:
+        df["price"] = df["Super (PMS)"]
+    elif "Local Price in KSH" in df.columns:
         df["price"] = df["Local Price in KSH"]
     elif "PMS" in df.columns:
         df["price"] = df["PMS"]
 
-    if "month" in df.columns:
+    if "From" in df.columns:
+        df["month"] = pd.to_datetime(df["From"], format="%d-%m-%Y")
+        df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
+    elif "month" in df.columns:
         df["month"] = pd.to_datetime(df["month"])
+        df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
     else:
         df["month"] = pd.to_datetime(df["date"])
+        df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
+
+    df.sort_values("month", inplace=True)
 
     # 3. Dynamically merge ALL market_indicators
     indicators_dir = PROCESSED_DIR / "market_indicators"
@@ -247,13 +260,13 @@ def get_training_data() -> pd.DataFrame:
             try:
                 df_ind = pd.read_csv(csv_path)
                 if "month" in df_ind.columns:
-                    df_ind["month"] = pd.to_datetime(df_ind["month"])
+                    df_ind["month"] = pd.to_datetime(df_ind["month"]).dt.to_period("M").dt.to_timestamp()
                     cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
                         "month"
                     ]
                     df = pd.merge(df, df_ind[cols_to_use], on="month", how="left")
                 elif "date" in df_ind.columns:
-                    df_ind["month"] = pd.to_datetime(df_ind["date"])
+                    df_ind["month"] = pd.to_datetime(df_ind["date"]).dt.to_period("M").dt.to_timestamp()
                     cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
                         "month"
                     ]
@@ -285,13 +298,13 @@ def get_training_data() -> pd.DataFrame:
 
 
 @app.post("/train/")
-def train_model():
+def train_model(town: str = Form("Nairobi")):
     """
     Train SARIMAX model dynamically. Uses merged pre-processed datasets
     by default, or the user's uploaded dataset if overridden.
     """
     try:
-        df = get_training_data()
+        df = get_training_data(town)
 
         # Initialize and Train model
         model = FuelSARIMAXModel()
@@ -340,7 +353,7 @@ def get_metrics():
 
 
 @app.post("/predict/")
-def predict_price(steps: int = Form(...), cap: float = Form(None)):
+def predict_price(steps: int = Form(...), cap: float = Form(None), town: str = Form("Nairobi")):
     """
     Predict future fuel prices with confidence intervals and optional regulatory cap.
     Forecasts start from the current month.
@@ -348,7 +361,7 @@ def predict_price(steps: int = Form(...), cap: float = Form(None)):
     try:
         from datetime import datetime
 
-        df = get_training_data()
+        df = get_training_data(town)
 
         # Calculate how many months gap is between the last historical data and current time
         last_date = df.index[-1]
@@ -521,23 +534,46 @@ def purge_all_files(
 # -------------------------------------------------------
 
 
+@app.get("/towns/")
+def get_towns():
+    """Returns a list of all available towns in the historical dataset."""
+    try:
+        prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
+        if not prices_file.exists():
+            return {"error": "Historical data file not found."}
+        df = pd.read_csv(prices_file)
+        if "Town" not in df.columns:
+            return {"towns": []}
+        
+        # Get unique sorted towns, handling NaN and empty
+        towns = sorted(list(set([str(t).strip() for t in df["Town"].dropna() if str(t).strip()])))
+        return {"towns": towns}
+    except Exception as e:
+        logger.error(f"Towns fetch error: {str(e)}")
+        return {"error": str(e)}
+
 @app.get("/history/")
-def get_history_data():
+def get_history_data(town: str = "Nairobi"):
     """
     Returns historical price data for Petrol (PMS), Diesel (AGO), and Kerosene (Kero).
+    Uses the provided town's prices from EPRA_Pump_Prices.csv to show monthly data.
     """
     try:
         prices_file = (
-            PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+            PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         )
         if not prices_file.exists():
             return {"error": "Historical data file not found."}
 
         df = pd.read_csv(prices_file)
 
-        # Standardize time column
-        if "month" in df.columns:
-            df["month"] = pd.to_datetime(df["month"])
+        # Filter for the chosen town
+        if "Town" in df.columns:
+            df = df[df["Town"].str.strip().str.lower() == town.lower()]
+
+        # Extract monthly dates from the 'From' column
+        if "From" in df.columns:
+            df["month"] = pd.to_datetime(df["From"], format="%d-%m-%Y")
         elif "date" in df.columns:
             df["month"] = pd.to_datetime(df["date"])
         else:
@@ -547,6 +583,10 @@ def get_history_data():
 
         # Prepare labels and values
         labels = [d.strftime("%b %Y") for d in df["month"]]
+
+        # Map actual columns to model names
+        if "Super (PMS)" in df.columns:
+            df.rename(columns={"Super (PMS)": "PMS", "Diesel (AGO)": "AGO", "Kerosene (IK)": "Kero"}, inplace=True)
 
         # Clean NaN values for JSON safety
         pms_values = (

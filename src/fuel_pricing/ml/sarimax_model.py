@@ -156,7 +156,7 @@ class FuelSARIMAXModel:
         # Create features
         df = self.create_features(df)
 
-        # Train/test split
+        # Train/test split for evaluation
         split_index = int(len(df) * (1 - test_size))
         train_df = df.iloc[:split_index]
         test_df = df.iloc[split_index:]
@@ -169,8 +169,8 @@ class FuelSARIMAXModel:
         exog_train = train_df.drop(columns=["price"])
         exog_test = test_df.drop(columns=["price"])
 
-        # Build SARIMAX model
-        self.model = SARIMAX(
+        # Evaluation model (on training split)
+        eval_model = SARIMAX(
             y_train,
             exog=exog_train,
             order=(1, 1, 1),
@@ -178,25 +178,34 @@ class FuelSARIMAXModel:
             enforce_stationarity=False,
             enforce_invertibility=False,
         )
-
-        # Fit model
-        self.results = self.model.fit(disp=False)
-
-        # Save trained model
-        joblib.dump(self.results, MODEL_PATH)
+        eval_results = eval_model.fit(disp=False)
 
         # Forecast test period
-        forecast = self.results.get_forecast(steps=len(y_test), exog=exog_test)
-
+        forecast = eval_results.get_forecast(steps=len(y_test), exog=exog_test)
         predictions = forecast.predicted_mean
 
         # Calculate metrics
         metrics = self.calculate_metrics(y_test, predictions)
 
-        # Save metrics
-        # joblib.dump(metrics, METRICS_PATH)
+        # --- FINAL FULL-DATA REFIT FOR PRODUCTION FORECASTS ---
+        y_full = df["price"]
+        exog_full = df.drop(columns=["price"])
 
+        self.model = SARIMAX(
+            y_full,
+            exog=exog_full,
+            order=(1, 1, 1),
+            seasonal_order=(1, 1, 1, 12),
+            enforce_stationarity=False,
+            enforce_invertibility=False,
+        )
+        self.results = self.model.fit(disp=False)
+
+        # Save trained final model
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.results, MODEL_PATH)
+
+        # Save metrics
         joblib.dump(self.metrics, MODEL_PATH.parent / "metrics.pkl")
 
         print("\nModel Evaluation")
