@@ -24,8 +24,13 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from fuel_pricing.core.config import PROCESSED_DIR
 
-MODEL_PATH = PROCESSED_DIR / "sarimax_model.pkl"
-METRICS_PATH = PROCESSED_DIR / "metrics.pkl"
+
+def get_model_path(fuel_type: str = "pms") -> Path:
+    return PROCESSED_DIR / f"sarimax_model_{fuel_type.lower()}.pkl"
+
+
+def get_metrics_path(fuel_type: str = "pms") -> Path:
+    return PROCESSED_DIR / f"metrics_{fuel_type.lower()}.pkl"
 
 
 class FuelSARIMAXModel:
@@ -39,7 +44,7 @@ class FuelSARIMAXModel:
         self.metrics = {}
 
         # Ensure directory exists
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
     # --------------------------
     # STEP 1: LOAD & MERGE DATA
@@ -133,7 +138,9 @@ class FuelSARIMAXModel:
     # --------------------
     # STEP 3: TRAIN MODEL
     # --------------------
-    def train_sarimax(self, df: pd.DataFrame, test_size: float = 0.2):
+    def train_sarimax(
+        self, df: pd.DataFrame, fuel_type: str = "pms", test_size: float = 0.2
+    ):
         """
         Train SARIMAX model and evaluate performance.
 
@@ -155,6 +162,12 @@ class FuelSARIMAXModel:
 
         # Create features
         df = self.create_features(df)
+
+        # Resample to monthly frequency to give SARIMAX a regular, aligned index.
+        # This prevents the "No supported index" warning and fixes 0.0 metric values
+        # caused by integer-vs-datetime index mismatch in get_forecast().
+        if isinstance(df.index, pd.DatetimeIndex):
+            df = df.resample("MS").mean().dropna(how="all")
 
         # Train/test split for evaluation
         split_index = int(len(df) * (1 - test_size))
@@ -184,8 +197,8 @@ class FuelSARIMAXModel:
         forecast = eval_results.get_forecast(steps=len(y_test), exog=exog_test)
         predictions = forecast.predicted_mean
 
-        # Calculate metrics
-        metrics = self.calculate_metrics(y_test, predictions)
+        # Use .values to avoid any residual index-alignment issues
+        metrics = self.calculate_metrics(y_test.values, predictions.values)
 
         # --- FINAL FULL-DATA REFIT FOR PRODUCTION FORECASTS ---
         y_full = df["price"]
@@ -202,11 +215,12 @@ class FuelSARIMAXModel:
         self.results = self.model.fit(disp=False)
 
         # Save trained final model
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(self.results, MODEL_PATH)
+        model_path = get_model_path(fuel_type)
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.results, model_path)
 
         # Save metrics
-        joblib.dump(self.metrics, MODEL_PATH.parent / "metrics.pkl")
+        joblib.dump(self.metrics, get_metrics_path(fuel_type))
 
         print("\nModel Evaluation")
         print("----------------")
@@ -218,7 +232,9 @@ class FuelSARIMAXModel:
     # -----------------------
     # STEP 4: PREDICT FUTURE
     # -----------------------
-    def predict(self, steps: int, future_exog: pd.DataFrame) -> dict:
+    def predict(
+        self, steps: int, future_exog: pd.DataFrame, fuel_type: str = "pms"
+    ) -> dict:
         """
         Forecast future fuel prices with confidence intervals.
 
@@ -235,11 +251,19 @@ class FuelSARIMAXModel:
             Keys: predicted_mean, lower_ci, upper_ci (all pd.Series)
         """
 
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError("Model file not found. Train the model first.")
+        model_path = get_model_path(fuel_type)
+        if not model_path.exists():
+            # Fallback to default model if specific fuel type model isn't found
+            # This handles cases where only the main model was trained
+            fallback_path = PROCESSED_DIR / "sarimax_model.pkl"
+            if not fallback_path.exists():
+                raise FileNotFoundError(
+                    f"Model file for {fuel_type} (or fallback) not found. Train the engine first."
+                )
+            model_path = fallback_path
 
         # Load saved model
-        self.results = joblib.load(MODEL_PATH)
+        self.results = joblib.load(model_path)
 
         # Create features for future exogenous data
         future_exog = self.create_features(future_exog)

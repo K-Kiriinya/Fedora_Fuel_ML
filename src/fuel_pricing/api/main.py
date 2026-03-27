@@ -25,16 +25,18 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import pandas as pd
+import numpy as np
+import re
 import shutil
 import secrets
 import logging
 import joblib
 import os
 
-from fuel_pricing.ml.sarimax_model import FuelSARIMAXModel
+from fuel_pricing.ml.sarimax_model import FuelSARIMAXModel, get_model_path, get_metrics_path
 from fuel_pricing.data.loader import load_and_prepare
 from fuel_pricing.pipelines.predict_pipeline import run_prediction
 from fuel_pricing.optimization.pricing import apply_cap
@@ -186,9 +188,14 @@ async def upload_file(file: UploadFile = File(...)):
         # Validate CSV structure
         try:
             df = pd.read_csv(file_path)
-            if "date" not in df.columns or "price" not in df.columns:
+            # Support either the old 'date/price' or the new regulatory columns
+            required_cols = ["From", "To", "Super (PMS)"] # Basic subset of current requirements
+            has_new = all(col in df.columns for col in required_cols)
+            has_old = "date" in df.columns and "price" in df.columns
+            
+            if not (has_new or has_old):
                 file_path.unlink()  # Delete invalid file
-                return {"error": "CSV must contain 'date' and 'price' columns"}
+                return {"error": "Invalid CSV structure. Missing mandatory regulatory columns (From, To, Super (PMS))"}
 
             # Basic data validation
             if len(df) == 0:
@@ -210,45 +217,110 @@ async def upload_file(file: UploadFile = File(...)):
         return {"error": f"Upload failed: {str(e)}"}
 
 
-def get_training_data(town: str = "Nairobi") -> pd.DataFrame:
+def flexible_date_parse(date_val):
+    """
+    Enhanced date parsing to support:
+    - ddmmyy / yymmdd (6 digits)
+    - ddth Month YY (e.g. 15th April 26)
+    - standard formats
+    """
+    if pd.isna(date_val):
+        return pd.NaT
+    
+    date_str = str(date_val).strip()
+    
+    # 1. Handle 6-digit numeric (ddmmyy or yymmdd)
+    if re.match(r'^\d{6}$', date_str):
+        try:
+            # Try ddmmyy first (usual Kenyan standard)
+            return pd.to_datetime(date_str, format='%d%m%y')
+        except:
+            # Try yymmdd
+            try:
+                return pd.to_datetime(date_str, format='%y%m%d')
+            except:
+                pass
+
+    # 2. Handle ordinal month names: 15th April 26, 1st May 26
+    # Remove ordinal suffixes (st, nd, rd, th)
+    clean_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str, flags=re.IGNORECASE)
+    
+    try:
+        # Pandas to_datetime is quite good if the ordinal is gone
+        return pd.to_datetime(clean_str)
+    except:
+        return pd.NaT
+
+
+def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataFrame:
     """
     Dynamically loads and merges all available processed datasets.
     """
-    # 1. Check for manual uploads
+    # 1. Check for manual uploads (user-uploaded custom data)
     csv_files = list(UPLOAD_DIR.glob("*.csv"))
-    if csv_files:
-        df = pd.read_csv(csv_files[0])
-        if "date" in df.columns and "price" in df.columns:
-            df["date"] = pd.to_datetime(df["date"])
-            df.set_index("date", inplace=True)
-            return df
+    # We only use uploads if they are explicitly the goal, but for the default 2026 logic,
+    # we should check if the user just uploaded something.
+    # To be safe and follow user's request, we prioritize the main EPRA databank.
 
     # 2. Main dataset (local_prices)
     prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
     if not prices_file.exists():
-        raise Exception("System Error: Default Processed local prices dataset missing.")
+        prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
 
-    df = pd.read_csv(prices_file)
+    if not prices_file.exists():
+         # Last resort: use upload if available
+         if csv_files:
+             df = pd.read_csv(csv_files[0])
+         else:
+             raise Exception("System Error: Historical dataset missing.")
+    else:
+        df = pd.read_csv(prices_file)
 
     # Filter for selected town
     if "Town" in df.columns:
         df = df[df["Town"].str.strip().str.lower() == town.lower()]
 
-    if "Super (PMS)" in df.columns:
-        df["price"] = df["Super (PMS)"]
+    # Advanced Mapping: Resolve requested fuel type to actual column names
+    price_aliases = {
+        "pms": ["Super (PMS)", "Super", "PMS", "Petrol", "Super Petrol", "Super (PMS)"],
+        "ago": ["Diesel (AGO)", "Diesel", "AGO", "Automotive Gas Oil", "Diesel (AGO)"],
+        "ik":  ["Kerosene (IK)", "Kerosene", "IK", "Illuminating Kerosene", "Kerosene (IK)"]
+    }
+
+    target_fuel = fuel_type.lower()
+    search_list = price_aliases.get(target_fuel, price_aliases["pms"])
+    
+    found_col = None
+    for alias in search_list:
+        if alias in df.columns:
+            found_col = alias
+            break
+
+    if found_col:
+        df["price"] = df[found_col]
+    elif "price" in df.columns:
+        pass # Already has a 'price' column
     elif "Local Price in KSH" in df.columns:
         df["price"] = df["Local Price in KSH"]
-    elif "PMS" in df.columns:
-        df["price"] = df["PMS"]
+    else:
+        # Final emergency fallback: try the first available fuel column
+        for col in ["Super (PMS)", "Diesel (AGO)", "Kerosene (IK)", "PMS", "AGO", "IK"]:
+            if col in df.columns:
+                df["price"] = df[col]
+                break
 
-    if "From" in df.columns:
-        df["month"] = pd.to_datetime(df["From"], format="%d-%m-%Y")
+    if "To" in df.columns:
+        # Use 'To' column to align with the end of the fuel cycle
+        df["month"] = df["To"].apply(flexible_date_parse)
+        df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
+    elif "From" in df.columns:
+        df["month"] = df["From"].apply(flexible_date_parse)
         df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
     elif "month" in df.columns:
-        df["month"] = pd.to_datetime(df["month"])
+        df["month"] = df["month"].apply(flexible_date_parse)
         df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
     else:
-        df["month"] = pd.to_datetime(df["date"])
+        df["month"] = df["date"].apply(flexible_date_parse)
         df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
 
     df.sort_values("month", inplace=True)
@@ -298,30 +370,32 @@ def get_training_data(town: str = "Nairobi") -> pd.DataFrame:
 
 
 @app.post("/train/")
-def train_model(town: str = Form("Nairobi")):
+async def train_endpoint(town: str = Form(...)):
     """
-    Train SARIMAX model dynamically. Uses merged pre-processed datasets
-    by default, or the user's uploaded dataset if overridden.
+    Train models for all fuel types (PMS, AGO, IK) for the given town.
     """
     try:
-        df = get_training_data(town)
-
-        # Initialize and Train model
-        model = FuelSARIMAXModel()
-        logger.info(f"Training model initiated with shape {df.shape}")
-
-        # Suppress possible statsmodels warnings temporarily for clean logs
+        fuels = ["pms", "ago", "ik"]
+        metrics_summary = {}
+        
+        # Suppress warnings for clean output
         import warnings
         from statsmodels.tools.sm_exceptions import ConvergenceWarning
+        
+        for fuel in fuels:
+            df = get_training_data(town, fuel)
+            model = FuelSARIMAXModel()
+            
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", ConvergenceWarning)
+                model.train_sarimax(df, fuel_type=fuel)
+                
+            metrics_summary[fuel] = model.metrics
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ConvergenceWarning)
-            model.train_sarimax(df)
-
-        logger.info("Model training completed successfully")
         return {
-            "message": "Model trained successfully.",
-            "metrics": model.metrics,
+            "message": f"Successfully trained engine for {town}.",
+            "metrics": metrics_summary, # Return full summary
+            "pms_metrics": metrics_summary.get("pms", {}), # Fallback for UI if it expects single
         }
 
     except Exception as e:
@@ -335,12 +409,22 @@ def train_model(town: str = Form("Nairobi")):
 
 
 @app.get("/metrics/")
-def get_metrics():
-    """Return the latest model training evaluation metrics."""
+async def get_metrics(fuel_type: str = "pms"):
+    """
+    Return the latest model evaluation metrics for a specific fuel type.
+    """
     try:
-        if not METRICS_PATH.exists():
-            return {"error": "No metrics found. Train the model first."}
-        metrics = joblib.load(METRICS_PATH)
+        metrics_path = get_metrics_path(fuel_type)
+        if not metrics_path.exists():
+            # Fallback
+            # Original METRICS_PATH was PROCESSED_DIR / "metrics.pkl"
+            # If the fuel-specific path doesn't exist, check the generic one
+            generic_metrics_path = PROCESSED_DIR / "metrics.pkl"
+            if not generic_metrics_path.exists():
+                return {"error": "No metrics available. Train the engine first."}
+            metrics_path = generic_metrics_path # Use generic if fuel-specific not found
+        
+        metrics = joblib.load(metrics_path)
         return metrics
     except Exception as e:
         logger.error(f"Metrics fetch error: {str(e)}")
@@ -353,76 +437,87 @@ def get_metrics():
 
 
 @app.post("/predict/")
-def predict_price(steps: int = Form(...), cap: float = Form(None), town: str = Form("Nairobi")):
+async def predict_price(
+    steps: int = Form(6), town: str = Form("Nairobi"), cap: float = Form(None)
+):
     """
-    Predict future fuel prices with confidence intervals and optional regulatory cap.
-    Forecasts start from the current month.
+    Generate fuel price predictions for Petrol, Diesel, and Kerosene simultaneously.
     """
     try:
-        from datetime import datetime
+        fuels = ["pms", "ago", "ik"]
+        combined_results = {}
+        date_labels = None
+        
+        for fuel in fuels:
+            df = get_training_data(town, fuel)
+            
+            # Handle cases where df might be empty or lack sufficient data
+            if df.empty or len(df) < 2: # Need at least 2 points for SARIMAX
+                combined_results[fuel] = {"prices": [0.0]*steps, "lower": [0.0]*steps, "upper": [0.0]*steps}
+                if date_labels is None: # Still generate date labels even if no data
+                    prediction_start = pd.Timestamp.now().to_period("M").to_timestamp() + pd.DateOffset(months=1)
+                    future_dates = pd.date_range(start=prediction_start, periods=steps, freq="MS")
+                    date_labels = [d.strftime("%b %Y") for d in future_dates]
+                continue
 
-        df = get_training_data(town)
+            last_date = df.index[-1]
+            prediction_start = last_date + pd.DateOffset(months=1)
 
-        # Calculate how many months gap is between the last historical data and current time
-        last_date = df.index[-1]
-        now = datetime.now()
-        current_month_start = datetime(now.year, now.month, 1)
+            # Prepare future exogenous variables
+            historic_exog = df.drop(columns=["price"])
+            if len(historic_exog) == 0:
+                # Fallback if no history exists for this city
+                combined_results[fuel] = {"prices": [0.0]*steps, "lower": [0.0]*steps, "upper": [0.0]*steps}
+                continue
 
-        # Gap calculation (months)
-        gap_steps = (current_month_start.year - last_date.year) * 12 + (
-            current_month_start.month - last_date.month
-        )
+            if steps <= len(historic_exog):
+                active_exog = historic_exog.iloc[-steps:].copy()
+            else:
+                repeats = (steps // len(historic_exog)) + 1
+                active_exog = (
+                    pd.concat([historic_exog] * repeats).iloc[-steps:].copy()
+                )
 
-        # We need to predict both the gap AND the user's requested future steps
-        total_steps = max(steps, gap_steps + steps)
+            model = FuelSARIMAXModel()
+            forecast_result = model.predict(steps=steps, future_exog=active_exog, fuel_type=fuel)
 
-        # Prepare future exogenous variables (cycling through history if needed)
-        # SARIMAX needs exactly total_steps exog points
-        historic_exog = df.drop(columns=["price"])
-        if total_steps <= len(historic_exog):
-            active_exog = historic_exog.iloc[-total_steps:].copy()
-        else:
-            # Repeat history if needed for long gaps
-            repeats = (total_steps // len(historic_exog)) + 1
-            active_exog = (
-                pd.concat([historic_exog] * repeats).iloc[-total_steps:].copy()
-            )
+            predicted = forecast_result["predicted_mean"]
+            lower_ci = forecast_result["lower_ci"]
+            upper_ci = forecast_result["upper_ci"]
 
-        model = FuelSARIMAXModel()
-        # Predict all steps (gap + future)
-        forecast_result = model.predict(steps=total_steps, future_exog=active_exog)
+            # Apply regulatory cap if provided
+            if cap is not None:
+                predicted = [apply_cap(p, cap) for p in predicted]
+                lower_ci = [apply_cap(p, cap) for p in lower_ci]
+                upper_ci = [apply_cap(p, cap) for p in upper_ci]
+            else:
+                predicted = predicted.tolist()
+                lower_ci = lower_ci.tolist()
+                upper_ci = upper_ci.tolist()
 
-        predicted_full = forecast_result["predicted_mean"]
-        lower_full = forecast_result["lower_ci"]
-        upper_full = forecast_result["upper_ci"]
+            # Ensure all values are float and serializable (strip numpy types and NaNs)
+            def clean_list(vals):
+                return [float(v) if np.isfinite(v) else 0.0 for v in vals]
 
-        # Slice to only include the specific future horizon requested by user (from NOW onwards)
-        predicted = predicted_full.iloc[-steps:]
-        lower_ci = lower_full.iloc[-steps:]
-        upper_ci = upper_full.iloc[-steps:]
+            combined_results[fuel] = {
+                "prices": clean_list(predicted),
+                "lower": clean_list(lower_ci),
+                "upper": clean_list(upper_ci)
+            }
 
-        # Apply regulatory cap if provided
-        if cap is not None:
-            predicted = [apply_cap(p, cap) for p in predicted]
-            lower_ci = [apply_cap(p, cap) for p in lower_ci]
-            upper_ci = [apply_cap(p, cap) for p in upper_ci]
-        else:
-            predicted = predicted.tolist()
-            lower_ci = lower_ci.tolist()
-            upper_ci = upper_ci.tolist()
+            if date_labels is None:
+                # Generate real future date labels starting from the month after data ends
+                future_dates = pd.date_range(
+                    start=prediction_start, periods=steps, freq="MS"
+                )
+                date_labels = [d.strftime("%b %Y") for d in future_dates]
 
-        # Generate real future date labels starting from NOW
-        future_dates = pd.date_range(
-            start=current_month_start, periods=steps, freq="MS"
-        )
-        date_labels = [d.strftime("%b %Y") for d in future_dates]
-
+        # Ensure response dictionary contains all fields even if some fuels failed
         return {
-            "forecast_steps": steps,
-            "predicted_prices": predicted,
-            "lower_ci": lower_ci,
-            "upper_ci": upper_ci,
-            "date_labels": date_labels,
+            "pms": combined_results.get("pms", {"prices": [], "lower": [], "upper": []}),
+            "ago": combined_results.get("ago", {"prices": [], "lower": [], "upper": []}),
+            "ik": combined_results.get("ik", {"prices": [], "lower": [], "upper": []}),
+            "date_labels": date_labels or []
         }
 
     except Exception as e:
@@ -540,6 +635,8 @@ def get_towns():
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
+            prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
+        if not prices_file.exists():
             return {"error": "Historical data file not found."}
         df = pd.read_csv(prices_file)
         if "Town" not in df.columns:
@@ -559,9 +656,9 @@ def get_history_data(town: str = "Nairobi"):
     Uses the provided town's prices from EPRA_Pump_Prices.csv to show monthly data.
     """
     try:
-        prices_file = (
-            PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
-        )
+        prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
+        if not prices_file.exists():
+            prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
         if not prices_file.exists():
             return {"error": "Historical data file not found."}
 
@@ -571,11 +668,13 @@ def get_history_data(town: str = "Nairobi"):
         if "Town" in df.columns:
             df = df[df["Town"].str.strip().str.lower() == town.lower()]
 
-        # Extract monthly dates from the 'From' column
-        if "From" in df.columns:
-            df["month"] = pd.to_datetime(df["From"], format="%d-%m-%Y")
+        # Extract monthly dates from the 'To' column to show full cycle history
+        if "To" in df.columns:
+            df["month"] = df["To"].apply(flexible_date_parse)
+        elif "From" in df.columns:
+            df["month"] = df["From"].apply(flexible_date_parse)
         elif "date" in df.columns:
-            df["month"] = pd.to_datetime(df["date"])
+            df["month"] = df["date"].apply(flexible_date_parse)
         else:
             return {"error": "Time column not found in dataset."}
 
