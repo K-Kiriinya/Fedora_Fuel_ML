@@ -29,6 +29,23 @@
                 <a href="/admin/" class="back-link" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin: 0; z-index: 10;">⚙️ Administrative Console</a>
             </div>
 
+            <!-- ═══════ HERO: Fuel Market Pulse ═══════ -->
+            <div class="card hero-card" id="historyCard">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.5rem;">📜 Fuel Market Pulse</h2>
+                        <p style="color: var(--text-secondary); font-size: 0.85em; margin-top: 4px;">Historical EPRA pump price caps across all regulated fuel types</p>
+                    </div>
+                    <select id="townSelect" style="padding: 10px 16px; border-radius: 10px; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); font-family: 'Lexend', sans-serif; font-size: 0.9em; font-weight: 500; min-width: 160px;">
+                        <option value="Nairobi">Nairobi</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-height: 420px; position: relative;">
+                    <canvas id="historyChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
+                </div>
+            </div>
+
+            <!-- ═══════ LOWER GRID: Controls + Forecast ═══════ -->
             <div class="dashboard-grid">
                 <!-- LEFT PANEL: Command Inputs -->
                 <div class="sidebar">
@@ -112,7 +129,7 @@
 
                 <!-- RIGHT PANEL: Graphical Interface -->
                 <div class="main-content">
-                    <div class="card" id="resultsCard" style="min-height: 75vh; overflow: hidden; display: flex;">
+                    <div class="card" id="resultsCard" style="min-height: 65vh; overflow: hidden; display: flex;">
                         <h2 style="margin-bottom: 20px;">📈 Predictive Trajectory</h2>
                         
                         <div id="placeholderResult" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.8; text-align: center; padding: 20px;">
@@ -140,19 +157,6 @@
                                     <tbody id="forecastBody"></tbody>
                                 </table>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Historical Comparison Card -->
-                    <div class="card" id="historyCard" style="min-height: 90vh; margin-top: 20px; overflow: hidden; display: flex;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin: 0;">📜 Fuel Market Pulse </h2>
-                            <select id="townSelect" style="padding: 8px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); font-family: 'Lexend', sans-serif;">
-                                <option value="Nairobi">Nairobi</option>
-                            </select>
-                        </div>
-                        <div style="flex: 1; min-height: 700px; position: relative;">
-                            <canvas id="historyChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
                         </div>
                     </div>
                 </div>

@@ -96,6 +96,21 @@ body::before {
     flex-direction: column;
 }
 
+/* Hero: Fuel Market Pulse (always visible first) */
+.hero-card {
+    min-height: 480px;
+    margin-bottom: 30px;
+    border-left: 4px solid #ef4444;
+}
+
+.hero-card h2 {
+    font-size: 1.5rem;
+}
+
+[data-theme='dark'] .hero-card {
+    border-left-color: #f87171;
+}
+
 /* Header & Controls */
 .top-controls {
     display: flex;
@@ -279,10 +294,6 @@ body::before {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    position: sticky;
-    top: 20px;
-    height: calc(100vh - 40px);
-    overflow-y: auto;
     padding-right: 5px;
 }
 .sidebar::-webkit-scrollbar { width: 6px; }
