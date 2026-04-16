@@ -1,15 +1,14 @@
 """
 Test Script for SARIMAX Model Validation
------------------------------------------
-
-This script tests the model with sample data and validates predictions.
 """
 
 import sys
-sys.path.insert(0, 'src')
+
+sys.path.insert(0, "src")
 
 import pandas as pd
 from fuel_pricing.ml.sarimax_model import FuelSARIMAXModel
+
 
 def test_model_training():
     """Test model training with sample data."""
@@ -19,15 +18,15 @@ def test_model_training():
 
     # Load sample data
     print("\n1. Loading sample data...")
-    df = pd.read_csv('data/external/sample_fuel_data.csv')
+    df = pd.read_csv("data/external/sample_fuel_data.csv")
     print(f"   ✓ Loaded {len(df)} data points")
     print(f"   ✓ Date range: {df['date'].min()} to {df['date'].max()}")
     print(f"   ✓ Columns: {list(df.columns)}")
 
     # Prepare data
     print("\n2. Preparing data...")
-    df['date'] = pd.to_datetime(df['date'])
-    df.set_index('date', inplace=True)
+    df["date"] = pd.to_datetime(df["date"])
+    df.set_index("date", inplace=True)
     print(f"   ✓ Data indexed by date")
     print(f"   ✓ Price range: KES {df['price'].min():.2f} - {df['price'].max():.2f}")
     print(f"   ✓ Average price: KES {df['price'].mean():.2f}")
@@ -54,8 +53,8 @@ def test_model_training():
 
         # Interpret metrics
         print("\n6. Metrics Interpretation:")
-        mae = model.metrics['MAE']
-        mape = model.metrics['MAPE']
+        mae = model.metrics["MAE"]
+        mape = model.metrics["MAPE"]
 
         if mae < 5:
             print(f"   ✓ MAE ({mae:.2f}) - EXCELLENT accuracy")
@@ -77,31 +76,32 @@ def test_model_training():
 
         # Test predictions
         print("\n7. Testing future predictions...")
-        future_exog = df.drop(columns=['price']).iloc[-6:].copy()
-        forecast = model.predict(steps=6, future_exog=future_exog)
+        future_exog = df.drop(columns=["price"]).iloc[-6:].copy()
+        forecast_result = model.predict(steps=6, future_exog=future_exog)
+        predicted_prices = forecast_result["predicted_mean"]
 
         print("\n   6-Month Forecast:")
         print("   " + "-" * 40)
-        for i, price in enumerate(forecast, 1):
+        for i, price in enumerate(predicted_prices, 1):
             print(f"   Month {i}: KES {price:.2f}")
         print("   " + "-" * 40)
 
         # Validate predictions
         print("\n8. Prediction Validation:")
-        last_price = df['price'].iloc[-1]
-        avg_forecast = forecast.mean()
+        last_price = df["price"].iloc[-1]
+        avg_forecast = predicted_prices.mean()
 
         print(f"   Last actual price: KES {last_price:.2f}")
         print(f"   Average forecast:  KES {avg_forecast:.2f}")
         print(f"   Difference:        KES {abs(avg_forecast - last_price):.2f}")
 
-        if forecast.min() > 0 and forecast.max() < 1000:
+        if predicted_prices.min() > 0 and predicted_prices.max() < 1000:
             print("   ✓ Predictions within reasonable range")
         else:
             print("   ✗ WARNING: Predictions outside expected range")
 
         # Check for trend consistency
-        price_trend = df['price'].iloc[-6:].mean()
+        price_trend = df["price"].iloc[-6:].mean()
         if abs(avg_forecast - price_trend) / price_trend < 0.2:
             print("   ✓ Forecast aligns with recent trend")
         else:
@@ -116,8 +116,10 @@ def test_model_training():
     except Exception as e:
         print(f"\n✗ ERROR: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 def test_edge_cases():
     """Test edge cases and error handling."""
@@ -129,11 +131,10 @@ def test_edge_cases():
 
     # Test 1: Missing price column
     print("\n1. Testing missing 'price' column...")
-    df_bad = pd.DataFrame({
-        'date': pd.date_range('2022-01-01', periods=10, freq='MS'),
-        'value': range(10)
-    })
-    df_bad.set_index('date', inplace=True)
+    df_bad = pd.DataFrame(
+        {"date": pd.date_range("2022-01-01", periods=10, freq="MS"), "value": range(10)}
+    )
+    df_bad.set_index("date", inplace=True)
 
     try:
         model.train_sarimax(df_bad)
@@ -144,10 +145,10 @@ def test_edge_cases():
 
     # Test 2: Small dataset
     print("\n2. Testing with minimal data...")
-    df_small = pd.read_csv('data/external/sample_fuel_data.csv')
+    df_small = pd.read_csv("data/external/sample_fuel_data.csv")
     df_small = df_small.head(15)  # Only 15 points
-    df_small['date'] = pd.to_datetime(df_small['date'])
-    df_small.set_index('date', inplace=True)
+    df_small["date"] = pd.to_datetime(df_small["date"])
+    df_small.set_index("date", inplace=True)
 
     try:
         predictions, y_test = model.train_sarimax(df_small, test_size=0.2)
@@ -160,6 +161,7 @@ def test_edge_cases():
     print("=" * 60)
 
     return True
+
 
 if __name__ == "__main__":
     print("\n🚀 Starting Model Validation Tests...\n")

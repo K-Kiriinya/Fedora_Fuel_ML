@@ -139,53 +139,76 @@ class FuelSARIMAXModel:
 
         # Create features
         df = self.create_features(df)
+        
+        # Ensure only clean numeric rows are passed
+        df = df.select_dtypes(include=[np.number])
+        df = df.ffill().bfill().dropna()
+
+        # Resample to ensure monthly frequency ONLY if needed (and fill gaps)
         if isinstance(df.index, pd.DatetimeIndex):
-            df = df.resample("MS").mean().dropna(how="all")
+            # Check if resampling is actually decreasing points or just filling gaps
+            df = df.resample("MS").mean().ffill().bfill().dropna()
+
+        print(f"DEBUG: Training dataset size: {len(df)}")
+        if len(df) < 5:
+            raise ValueError(f"Insufficient data for training: {len(df)} points found. Minimum 5 required.")
 
         # Train/test split for evaluation
-        split_index = int(len(df) * (1 - test_size))
+        test_size = 0.2 if len(df) >= 10 else 0.1
+        split_index = max(1, int(len(df) * (1 - test_size)))
         train_df = df.iloc[:split_index]
         test_df = df.iloc[split_index:]
 
-        # Target variable
-        y_train = train_df["price"]
-        y_test = test_df["price"]
+        # Fixed dimensionality: Ensure 1D numpy arrays for endog
+        y_train = train_df["price"].to_numpy().flatten()
+        y_test = test_df["price"].to_numpy().flatten()
 
         # Exogenous variables
-        exog_train = train_df.drop(columns=["price"])
-        exog_test = test_df.drop(columns=["price"])
+        exog_train = train_df.drop(columns=["price"]).to_numpy()
+        exog_test = test_df.drop(columns=["price"]).to_numpy()
 
+        # Determine safe order for small datasets
+        # Simple ARIMA(1,1,0) if N < 15 to avoid complex startup failure
+        p, d, q = (1, 1, 1) if len(y_train) >= 15 else (1, 1, 0)
+        
         # Evaluation model (on training split)
+        seasonal_train = (1, 1, 1, 12) if len(y_train) >= 24 else (0, 0, 0, 0)
+        
         eval_model = SARIMAX(
             y_train,
             exog=exog_train,
-            order=(1, 1, 1),
-            seasonal_order=(1, 1, 1, 12),
-            enforce_stationarity=False,
-            enforce_invertibility=False,
+            order=(p, d, q),
+            seasonal_order=seasonal_train,
+            enforce_stationarity=True,  # Changed to True for stability
+            enforce_invertibility=True,   # Changed to True for stability
         )
-        eval_results = eval_model.fit(disp=False)
+        eval_results = eval_model.fit(disp=False, maxiter=200)
 
         # Forecast test period
         forecast = eval_results.get_forecast(steps=len(y_test), exog=exog_test)
         predictions = forecast.predicted_mean
 
         # Use .values to avoid any residual index-alignment issues
-        metrics = self.calculate_metrics(y_test.values, predictions.values)
+        metrics = self.calculate_metrics(y_test, predictions)
 
         # --- FINAL FULL-DATA REFIT FOR PRODUCTION FORECASTS ---
-        y_full = df["price"]
-        exog_full = df.drop(columns=["price"])
+        y_full = df["price"].to_numpy().flatten()
+        exog_full = df.drop(columns=["price"]).to_numpy()
+
+        seasonal_full = (1, 1, 1, 12) if len(y_full) >= 24 else (0, 0, 0, 0)
+        
+        # Re-calc order for full set
+        p_f, d_f, q_f = (1, 1, 1) if len(y_full) >= 15 else (1, 1, 0)
 
         self.model = SARIMAX(
             y_full,
             exog=exog_full,
-            order=(1, 1, 1),
-            seasonal_order=(1, 1, 1, 12),
-            enforce_stationarity=False,
-            enforce_invertibility=False,
+            order=(p_f, d_f, q_f),
+            seasonal_order=seasonal_full,
+            enforce_stationarity=True,
+            enforce_invertibility=True,
         )
-        self.results = self.model.fit(disp=False)
+        self.results = self.model.fit(disp=False, maxiter=200)
 
         # Save trained final model
         model_path = get_model_path(fuel_type)
@@ -222,15 +245,36 @@ class FuelSARIMAXModel:
 
         # Create features for future exogenous data
         future_exog = self.create_features(future_exog)
+        
+        # Force exog to numpy if we trained with numpy
+        exog_np = future_exog.to_numpy()
 
-        forecast = self.results.get_forecast(steps=steps, exog=future_exog)
-
+        forecast = self.results.get_forecast(steps=steps, exog=exog_np)
+        
+        predicted = forecast.predicted_mean
         conf_int = forecast.conf_int()
 
+        # Handle both pandas objects and numpy arrays from statsmodels results
+        if hasattr(predicted, "to_numpy"):
+            predicted = predicted.to_numpy()
+        
+        if hasattr(conf_int, "iloc"):
+            lower = conf_int.iloc[:, 0].to_numpy()
+            upper = conf_int.iloc[:, 1].to_numpy()
+        else:
+            # Statsmodels returns ndarray if no index was provided during training
+            lower = conf_int[:, 0]
+            upper = conf_int[:, 1]
+
+        # Sanity check: Cap forecasts at reasonable fuel price extremes
+        # This prevents divergent linear trends from showing absurd values
+        def sanity_cap(arr):
+            return np.clip(arr, 0.0, 500.0)
+
         return {
-            "predicted_mean": forecast.predicted_mean,
-            "lower_ci": conf_int.iloc[:, 0],
-            "upper_ci": conf_int.iloc[:, 1],
+            "predicted_mean": sanity_cap(predicted.flatten()),
+            "lower_ci": sanity_cap(lower.flatten()),
+            "upper_ci": sanity_cap(upper.flatten()),
         }
 
     # --------------

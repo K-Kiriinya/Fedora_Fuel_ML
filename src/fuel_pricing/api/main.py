@@ -316,26 +316,31 @@ def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataF
         for csv_path in indicators_dir.glob("*.csv"):
             try:
                 df_ind = pd.read_csv(csv_path)
+                
+                # Identify date column
+                target_date_col = None
                 if "month" in df_ind.columns:
-                    df_ind["month"] = (
-                        pd.to_datetime(df_ind["month"])
-                        .dt.to_period("M")
-                        .dt.to_timestamp()
-                    )
-                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
-                        "month"
-                    ]
-                    df = pd.merge(df, df_ind[cols_to_use], on="month", how="left")
+                    target_date_col = "month"
                 elif "date" in df_ind.columns:
+                    target_date_col = "date"
+                
+                if target_date_col:
+                    # Standardize to monthly start timestamp
                     df_ind["month"] = (
-                        pd.to_datetime(df_ind["date"])
+                        pd.to_datetime(df_ind[target_date_col])
                         .dt.to_period("M")
                         .dt.to_timestamp()
                     )
-                    cols_to_use = df_ind.columns.difference(df.columns).tolist() + [
-                        "month"
-                    ]
-                    df = pd.merge(df, df_ind[cols_to_use], on="month", how="left")
+                    
+                    # ⚠️ CRITICAL: Aggregate by month to prevent row explosion on merge
+                    # Multiple indicator entries in a single month would otherwise create a Cartesian product
+                    df_ind_numeric = df_ind.select_dtypes(include=[np.number]).copy()
+                    df_ind_numeric["month"] = df_ind["month"]
+                    df_ind_grouped = df_ind_numeric.groupby("month").mean().reset_index()
+                    
+                    # Filter columns to avoid duplicates (except month)
+                    cols_to_use = df_ind_grouped.columns.difference(df.columns).tolist() + ["month"]
+                    df = pd.merge(df, df_ind_grouped[cols_to_use], on="month", how="left")
             except Exception as e:
                 logger.warning(f"Skipped indicator {os.path.basename(csv_path)}: {e}")
 
@@ -344,10 +349,21 @@ def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataF
     df.index.name = "date"
 
     # 5. Extract fully numeric feature matrix
-    numeric_df = df.select_dtypes(include=["number"])
+    numeric_df = df.select_dtypes(include=["number"]).copy()
+
+    # ⚠️ CRITICAL: Remove all potential target columns from features to prevent leakage/cheating
+    # If the target price is also in exog, the model will just learn price = price
+    price_cols_to_drop = [
+        "Super (PMS)", "Diesel (AGO)", "Kerosene (IK)",
+        "PMS", "AGO", "IK", "Super", "Diesel", "Kerosene",
+        "Petrol", "Super Petrol", "Automotive Gas Oil", "Illuminating Kerosene",
+        "Local Price in KSH"
+    ]
+    for col in price_cols_to_drop:
+        if col in numeric_df.columns and col != "price":
+            numeric_df.drop(columns=[col], inplace=True)
 
     # Safely interpolate missing values across mismatched indicator date ranges
-    # to protect SARIMAX strict constraint against NaN
     numeric_df = numeric_df.ffill().bfill()
     numeric_df = numeric_df.dropna(axis=1, how="all")
 
@@ -484,12 +500,14 @@ async def predict_price(
 
             # Ensure all values are float and serializable (strip numpy types and NaNs)
             def clean_list(vals):
-                return [float(v) if np.isfinite(v) else 0.0 for v in vals]
+                # Enforce non-negativity and clean serializable floats
+                return [max(0.0, float(v)) if np.isfinite(v) else 0.0 for v in vals]
 
             combined_results[fuel] = {
                 "prices": clean_list(predicted),
                 "lower": clean_list(lower_ci),
                 "upper": clean_list(upper_ci),
+                "current_price": float(df["price"].iloc[-1]) if not df.empty else 0.0,
             }
 
             if date_labels is None:
