@@ -40,7 +40,7 @@
                 <div class="prices-meta" id="pricesMeta"></div>
             </div>
 
-            <!-- ═══════ HERO: Fuel Market Pulse ═══════ -->
+            <!-- ═══════ Fuel Market Pulse ═══════ -->
             <div class="card hero-card" id="historyCard">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
                     <div>
@@ -58,6 +58,7 @@
 
             <!-- ═══════ LOWER GRID: Controls + Forecast ═══════ -->
             <div class="dashboard-grid">
+
                 <!-- LEFT PANEL: Command Inputs -->
                 <div class="sidebar">
                     <!-- Upload CSV -->
@@ -72,7 +73,7 @@
                         </form>
                         <div id="uploadMessage" class="message"></div>
 
-                        <!-- Space-Saving Accordion for requirements -->
+                        <!-- Requirements -->
                         <details class="data-requirements">
                             <summary>📋 View System Requirements</summary>
                             <div class="req-content">
@@ -100,7 +101,7 @@
                         </form>
                         <div id="trainMessage" class="message"></div>
 
-                        <!-- Metrics Mini Cards (revealed after training) -->
+                        <!-- Metrics Mini Cards -->
                         <div id="metricsCards" class="metrics-mini" style="display:none;">
                             <div class="metric-card">
                                 <span class="metric-label">MAE</span>
@@ -201,11 +202,9 @@
                 const cachedPred = localStorage.getItem('latest_prediction');
                 if (cachedPred && forecastChartInstance) {
                     const p = JSON.parse(cachedPred);
-                    // Re-render using current multi-fuel format
                     createForecastChart(p);
                 }
 
-                // Update history chart colors without re-fetching
                 if (cachedHistoryData) {
                     renderHistoryChart(cachedHistoryData);
                 }
@@ -295,7 +294,7 @@
                         localStorage.removeItem('latest_prediction');
                         hideResults();
                         updateStatusIndicator();
-                        fetchCurrentPrices(); // Refresh price ticker after new upload
+                        fetchCurrentPrices(); // Refresh price
                     }
                     message.style.display = 'block';
                 } catch (error) {
@@ -736,8 +735,6 @@
                     if (!result.error) {
                         localStorage.setItem('latest_prediction', JSON.stringify(result));
                         renderResults(result);
-                        
-                        // NEW: Update metrics display after default initialization
                         await fetchMetrics();
                         
                         const message = document.getElementById('predictMessage');

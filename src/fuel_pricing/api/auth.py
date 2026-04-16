@@ -1,8 +1,5 @@
 """
-Authentication Module for Fedora Fuel ML
------------------------------------------
-
-Provides JWT-based authentication for protected endpoints.
+Authentication Module
 """
 
 from datetime import datetime, timedelta, timezone
@@ -38,25 +35,15 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
     Create a JWT access token.
-
-    Parameters
-    ----------
-    data : dict
-        Data to encode in the token (e.g., {"sub": "username"})
-    expires_delta : timedelta, optional
-        Token expiration time
-
-    Returns
-    -------
-    str
-        Encoded JWT token
     """
     to_encode = data.copy()
 
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -67,21 +54,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def decode_access_token(token: str) -> dict:
     """
     Decode and verify a JWT token.
-
-    Parameters
-    ----------
-    token : str
-        JWT token to decode
-
-    Returns
-    -------
-    dict
-        Decoded token payload
-
-    Raises
-    ------
-    HTTPException
-        If token is invalid or expired
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -94,24 +66,11 @@ def decode_access_token(token: str) -> dict:
         )
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
     """
     Dependency to get the current authenticated user.
-
-    Parameters
-    ----------
-    credentials : HTTPAuthorizationCredentials
-        HTTP Authorization header with Bearer token
-
-    Returns
-    -------
-    dict
-        User information from token
-
-    Raises
-    ------
-    HTTPException
-        If authentication fails
     """
     token = credentials.credentials
     payload = decode_access_token(token)
@@ -127,8 +86,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return {"username": username}
 
 
-# Dummy user database (replace with real database in production)
-# Note: Password will be hashed on first use (lazy initialization)
 _users_initialized = False
 fake_users_db = {}
 
@@ -141,7 +98,7 @@ def _initialize_users():
             "username": "admin",
             "full_name": "Admin User",
             "email": "admin@fedorafuel.ml",
-            "hashed_password": get_password_hash("admin123"),  # Default password: admin123
+            "hashed_password": get_password_hash("admin123"),
             "disabled": False,
         }
         _users_initialized = True
@@ -150,18 +107,6 @@ def _initialize_users():
 def authenticate_user(username: str, password: str) -> Optional[dict]:
     """
     Authenticate a user with username and password.
-
-    Parameters
-    ----------
-    username : str
-        Username
-    password : str
-        Plain text password
-
-    Returns
-    -------
-    dict or None
-        User dict if authentication succeeds, None otherwise
     """
     # Initialize users on first call
     _initialize_users()

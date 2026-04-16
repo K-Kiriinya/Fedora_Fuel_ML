@@ -2,8 +2,7 @@
 SARIMAX Model for Fuel Price Forecasting
 ----------------------------------------
 
-This module defines a production-ready SARIMAX model class
-for modeling fuel prices with exogenous shock variables.
+This module defines a SARIMAX model for modeling fuel prices with exogenous shock variables.
 
 Features:
 - Data preparation & merging
@@ -55,16 +54,7 @@ class FuelSARIMAXModel:
         """
         Merge price data with exogenous shock variables.
 
-        Parameters
-        ----------
-        price_df : DataFrame
-            Contains date and price columns.
-        shock_df : DataFrame
-            Contains exogenous variables and event indicators.
-
-        Returns
-        -------
-        DataFrame
+        Returns:
             Cleaned and merged dataset indexed by date.
         """
 
@@ -89,8 +79,7 @@ class FuelSARIMAXModel:
     # ----------------------------
     def create_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Create interaction and transformation features
-        to capture non-linear relationships.
+        Create interaction and transformation features to capture non-linear relationships.
         """
 
         df = df.copy()
@@ -143,18 +132,6 @@ class FuelSARIMAXModel:
     ):
         """
         Train SARIMAX model and evaluate performance.
-
-        Parameters
-        ----------
-        df : DataFrame
-            Dataset including price and exogenous features.
-        test_size : float
-            Proportion of data used for testing.
-
-        Returns
-        -------
-        predictions : Series
-        y_test : Series
         """
 
         if "price" not in df.columns:
@@ -162,10 +139,6 @@ class FuelSARIMAXModel:
 
         # Create features
         df = self.create_features(df)
-
-        # Resample to monthly frequency to give SARIMAX a regular, aligned index.
-        # This prevents the "No supported index" warning and fixes 0.0 metric values
-        # caused by integer-vs-datetime index mismatch in get_forecast().
         if isinstance(df.index, pd.DatetimeIndex):
             df = df.resample("MS").mean().dropna(how="all")
 
@@ -229,32 +202,14 @@ class FuelSARIMAXModel:
 
         return predictions, y_test
 
-    # -----------------------
-    # STEP 4: PREDICT FUTURE
-    # -----------------------
+    # ------------------------------------------------------------------------------
+    # STEP 4: PREDICT FUTURE: Forecast future fuel prices with confidence intervals
+    # ------------------------------------------------------------------------------
     def predict(
         self, steps: int, future_exog: pd.DataFrame, fuel_type: str = "pms"
     ) -> dict:
-        """
-        Forecast future fuel prices with confidence intervals.
-
-        Parameters
-        ----------
-        steps : int
-            Number of periods to forecast.
-        future_exog : DataFrame
-            Future exogenous variables.
-
-        Returns
-        -------
-        dict
-            Keys: predicted_mean, lower_ci, upper_ci (all pd.Series)
-        """
-
         model_path = get_model_path(fuel_type)
         if not model_path.exists():
-            # Fallback to default model if specific fuel type model isn't found
-            # This handles cases where only the main model was trained
             fallback_path = PROCESSED_DIR / "sarimax_model.pkl"
             if not fallback_path.exists():
                 raise FileNotFoundError(
@@ -278,13 +233,10 @@ class FuelSARIMAXModel:
             "upper_ci": conf_int.iloc[:, 1],
         }
 
-    # -------------------------
+    # --------------
     # MODEL SUMMARY
-    # ------------------------
+    # --------------
     def summary(self):
-        """
-        Print model statistical summary.
-        """
 
         if self.results is None:
             raise Exception("Model not trained or loaded.")
