@@ -220,34 +220,38 @@ async def upload_file(file: UploadFile = File(...)):
 def flexible_date_parse(date_val):
     """
     Enhanced date parsing to support:
+    - DD-MM-YYYY / DD/MM/YYYY  (EPRA standard — must try before pandas default)
     - ddmmyy / yymmdd (6 digits)
     - ddth Month YY (e.g. 15th April 26)
-    - standard formats
+    - standard ISO formats
     """
     if pd.isna(date_val):
         return pd.NaT
-    
+
     date_str = str(date_val).strip()
-    
-    # 1. Handle 6-digit numeric (ddmmyy or yymmdd)
+
+    # 1. Explicit DD-MM-YYYY and DD/MM/YYYY (EPRA format — day first)
+    for fmt in ('%d-%m-%Y', '%d/%m/%Y', '%d-%m-%y', '%d/%m/%y'):
+        try:
+            return pd.to_datetime(date_str, format=fmt)
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Handle 6-digit numeric (ddmmyy or yymmdd)
     if re.match(r'^\d{6}$', date_str):
         try:
-            # Try ddmmyy first (usual Kenyan standard)
             return pd.to_datetime(date_str, format='%d%m%y')
         except:
-            # Try yymmdd
             try:
                 return pd.to_datetime(date_str, format='%y%m%d')
             except:
                 pass
 
-    # 2. Handle ordinal month names: 15th April 26, 1st May 26
-    # Remove ordinal suffixes (st, nd, rd, th)
+    # 3. Handle ordinal month names: 15th April 26, 1st May 26
     clean_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str, flags=re.IGNORECASE)
-    
+
     try:
-        # Pandas to_datetime is quite good if the ordinal is gone
-        return pd.to_datetime(clean_str)
+        return pd.to_datetime(clean_str, dayfirst=True)
     except:
         return pd.NaT
 
@@ -256,8 +260,7 @@ def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataF
     """
     Dynamically loads datasets with strict priority:
     1. User Uploads (UPLOAD_DIR)
-    2. EPRA Regulatory Fallback (EPRA_Pump_Prices.csv)
-    3. Last Resort (kenyan_oil_prices_monthly_clean.csv)
+    2. EPRA Regulatory data (EPRA_Pump_Prices.csv)
     """
     # 1. PRIORITY: Check for manual uploads (user-uploaded custom data)
     csv_files = list(UPLOAD_DIR.glob("*.csv"))
@@ -268,10 +271,6 @@ def get_training_data(town: str = "Nairobi", fuel_type: str = "pms") -> pd.DataF
     else:
         # 2. FALLBACK: Main regulatory dataset
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
-        if not prices_file.exists():
-            # 3. LAST RESORT
-            prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
-
         if not prices_file.exists():
             raise Exception("System Error: No historical or uploaded datasets found.")
         
@@ -630,16 +629,85 @@ def purge_all_files(
 # -------------------------------------------------------
 
 
+@app.get("/current-prices/")
+def get_current_prices(town: str = "Nairobi"):
+    """
+    Returns the most recent pump prices (PMS, AGO, Kerosene) for a given town.
+    Reflects uploaded data with EPRA regulatory fallback.
+    """
+    try:
+        prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
+        if not prices_file.exists():
+            return {"error": "No price data available."}
+        df = pd.read_csv(prices_file)
+
+        # Filter by town if column exists
+        if "Town" in df.columns:
+            town_df = df[df["Town"].astype(str).str.strip().str.lower() == town.lower()]
+            if not town_df.empty:
+                df = town_df
+
+        # Parse dates — prefer 'From' as the period-start anchor
+        from_col = next((c for c in ["From", "date", "timestamp"] if c in df.columns), None)
+        to_col   = next((c for c in ["To", "Period"]               if c in df.columns), None)
+
+        if from_col:
+            df["_from_date"] = df[from_col].apply(flexible_date_parse)
+            df = df[df["_from_date"].notna()]
+            # Pick the row(s) with the maximum From date (= the current period)
+            max_from = df["_from_date"].max()
+            latest_rows = df[df["_from_date"] == max_from]
+            latest = latest_rows.iloc[0]
+            period_from = max_from.strftime("%d %b %Y")
+            period_to   = (latest[to_col].strip() if to_col and pd.notna(latest[to_col])
+                           else None)
+            # Try to parse and reformat period_to neatly
+            if period_to:
+                parsed_to = flexible_date_parse(period_to)
+                period_to = parsed_to.strftime("%d %b %Y") if pd.notna(parsed_to) else period_to
+        else:
+            latest = df.iloc[0]  # fallback: first row
+            period_from = None
+            period_to   = None
+
+        # Fuzzy-match column names for each fuel type
+        def find_price(row, patterns):
+            for p in patterns:
+                for col in row.index:
+                    if p.upper() in col.upper():
+                        try:
+                            val = float(row[col])
+                            if val > 0:
+                                return round(val, 2)
+                        except (ValueError, TypeError):
+                            pass
+            return None
+
+        pms  = find_price(latest, ["PMS", "SUPER", "PETROL"])
+        ago  = find_price(latest, ["AGO", "DIESEL"])
+        kero = find_price(latest, ["IK", "KERO"])
+
+        return {
+            "pms":  pms,
+            "ago":  ago,
+            "kero": kero,
+            "period_from": period_from,
+            "period_to":   period_to,
+            "town": town,
+        }
+
+    except Exception as e:
+        logger.error(f"Current prices error: {str(e)}")
+        return {"error": str(e)}
+
+
 @app.get("/towns/")
 def get_towns():
     """Returns a list of all available towns from the official regulatory fallback."""
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
-            prices_file = PROCESSED_DIR / "local_prices" / "kenyan_oil_prices_monthly_clean.csv"
-        
-        if not prices_file.exists():
-            return {"error": "Historical data file not found."}
+            return {"error": "No historical data available."}
 
         df = pd.read_csv(prices_file)
         if "Town" not in df.columns:

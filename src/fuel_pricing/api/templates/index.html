@@ -29,6 +29,17 @@
                 <a href="/admin/" class="back-link" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); margin: 0; z-index: 10;">⚙️ Administrative Console</a>
             </div>
 
+            <!-- ═══════ CURRENT PRICES TICKER ═══════ -->
+            <div class="prices-strip" id="pricesTicker">
+                <div class="prices-strip-inner" id="pricesInner">
+                    <div class="prices-loading" id="pricesLoading">
+                        <span class="prices-dot"></span> Loading current prices…
+                    </div>
+                    <!-- Price cards injected by JS -->
+                </div>
+                <div class="prices-meta" id="pricesMeta"></div>
+            </div>
+
             <!-- ═══════ HERO: Fuel Market Pulse ═══════ -->
             <div class="card hero-card" id="historyCard">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
@@ -221,6 +232,7 @@
             updateStatusIndicator();
             fetchMetrics();
             loadTownsAndHistory();
+            fetchCurrentPrices();
 
             /* === FORM HANDLERS === */
             const applyLoading = (cardId, btnId, loadingText) => {
@@ -283,6 +295,7 @@
                         localStorage.removeItem('latest_prediction');
                         hideResults();
                         updateStatusIndicator();
+                        fetchCurrentPrices(); // Refresh price ticker after new upload
                     }
                     message.style.display = 'block';
                 } catch (error) {
@@ -491,14 +504,72 @@
                 const stored = localStorage.getItem('latest_prediction');
                 if (stored) renderResults(JSON.parse(stored));
 
-                // NEW: Fetch towns and historical chart
+                // Fetch towns, historical chart, and price ticker
                 loadTownsAndHistory();
+                fetchCurrentPrices();
 
                 fetchMetrics();
                 
                 // Refresh metrics periodically
                 setInterval(fetchMetrics, 30000);
             });
+
+            /* === CURRENT PRICES TICKER === */
+            async function fetchCurrentPrices() {
+                const select = document.getElementById('townSelect');
+                const town = select ? select.value : 'Nairobi';
+                const inner = document.getElementById('pricesInner');
+                const meta  = document.getElementById('pricesMeta');
+                
+                try {
+                    const res  = await fetch('/current-prices/?town=' + encodeURIComponent(town));
+                    const data = await res.json();
+
+                    if (data.error) {
+                        inner.innerHTML = `<span class="prices-unavailable">Prices unavailable</span>`;
+                        return;
+                    }
+
+                    const fmt = (v) => v != null ? 'KES ' + parseFloat(v).toFixed(2) : '—';
+
+                    inner.innerHTML = `
+                        <div class="price-chip" id="priceChipPMS">
+                            <span class="price-chip-dot" style="background:#ef4444"></span>
+                            <div class="price-chip-body">
+                                <span class="price-chip-label">Super Petrol (PMS)</span>
+                                <span class="price-chip-value">${fmt(data.pms)}</span>
+                            </div>
+                        </div>
+                        <div class="price-chip-divider"></div>
+                        <div class="price-chip" id="priceChipAGO">
+                            <span class="price-chip-dot" style="background:#f59e0b"></span>
+                            <div class="price-chip-body">
+                                <span class="price-chip-label">Diesel (AGO)</span>
+                                <span class="price-chip-value">${fmt(data.ago)}</span>
+                            </div>
+                        </div>
+                        <div class="price-chip-divider"></div>
+                        <div class="price-chip" id="priceChipIK">
+                            <span class="price-chip-dot" style="background:#38bdf8"></span>
+                            <div class="price-chip-body">
+                                <span class="price-chip-label">Kerosene (IK)</span>
+                                <span class="price-chip-value">${fmt(data.kero)}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    if (data.period_from && data.period_to) {
+                        meta.textContent = `📅 ${data.period_from} – ${data.period_to}  ·  ${data.town}`;
+                    } else if (data.period_to) {
+                        meta.textContent = `📅 Effective ${data.period_to}  ·  ${data.town}`;
+                    } else {
+                        meta.textContent = `📍 ${data.town}`;
+                    }
+
+                } catch (err) {
+                    inner.innerHTML = `<span class="prices-unavailable">Unable to load prices</span>`;
+                }
+            }
 
             async function loadTownsAndHistory() {
                 try {
@@ -519,6 +590,7 @@
                         
                         select.addEventListener('change', () => {
                             loadHistory();
+                            fetchCurrentPrices(); // Keep ticker in sync with town selection
                         });
                     }
                 } catch (e) {

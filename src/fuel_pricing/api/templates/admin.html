@@ -9,12 +9,14 @@
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
         /* ── Tabbed Params Panel ── */
-        .param-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+        .param-tabs { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 10px; width: 100%; flex-shrink: 0; }
         .param-tab {
-            padding: 6px 14px; border-radius: 20px; border: 1px solid var(--card-border);
+            flex: 1;
+            padding: 8px 12px; border-radius: 20px; border: 1px solid var(--card-border);
             background: var(--mesh-bg); color: var(--text-secondary);
-            cursor: pointer; font-size: 0.8em; font-weight: 600;
+            cursor: pointer; font-size: 0.85em; font-weight: 600; text-align: center;
             transition: all 0.2s;
+            white-space: nowrap;
         }
         .param-tab.active {
             background: var(--accent); color: var(--card-bg); border-color: var(--accent);
@@ -110,8 +112,22 @@
             <!-- 2 Column Layout -->
             <div class="admin-grid">
                 
-                <!-- Left Panel -->
-                <div class="card" style="display: flex; flex-direction: column; overflow: hidden; justify-content: space-between;">
+                <!-- Left Panel Layout -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Forecast Sync (Top Left Small Box) -->
+                    <div class="card" style="min-height: 250px; display: flex; flex-direction: column; margin-bottom: 0;">
+                        <h2 style="font-size: 1.1em; margin-bottom: 5px;">📉 Latest Forecast Sync</h2>
+                        <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center; min-height: 120px;">
+                            <span style="font-size: 2em; margin-bottom: 5px;">💤</span>
+                            <span style="font-size: 0.85em;">No cached forecast available.</span>
+                        </div>
+                        <div id="adminChartContainer" style="display: none; flex: 1; min-height: 120px; position: relative;">
+                            <canvas id="adminForecastChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Left Panel Bottom Card: Datasets & Controls -->
+                    <div class="card" style="display: flex; flex-direction: column; overflow: hidden; justify-content: space-between; flex: 1; margin-bottom: 0;">
                     <div>
                         <h2>📁 Ingested Datasets</h2>
                         <div class="table-wrapper">
@@ -162,23 +178,27 @@
                             </form>
                         </div>
                     </div>
-                </div>
+                    </div>
+                </div> <!-- End Left Panel Layout -->
 
-                <!-- Right Panel: Predictive Parameters (tabbed) -->
-                <div class="card" style="display: flex; flex-direction: column; overflow: hidden;">
-                    <h2>🤖 Predictive Parameters</h2>
-
-                    <!-- Tab Nav -->
+                <!-- Right Panel Layout (Tabs above card) -->
+                <div style="display: flex; flex-direction: column; gap: 15px; flex: 1;">
+                    
+                    <!-- Top side: Tabs outside right panel content -->
                     <div class="param-tabs">
-                        <button class="param-tab active" onclick="showTab('tab-model', this)">Model Config</button>
+                        <button class="param-tab active" onclick="showTab('tab-metrics', this)">Accuracy Metrics</button>
+                        <button class="param-tab" onclick="showTab('tab-model', this)">Model Config</button>
                         <button class="param-tab" onclick="showTab('tab-features', this)">Feature Engineering</button>
                         <button class="param-tab" onclick="showTab('tab-data', this)">Data Pipeline</button>
-                        <button class="param-tab" onclick="showTab('tab-metrics', this)">Accuracy Metrics</button>
-                        <button class="param-tab" onclick="showTab('tab-forecast', this)">Forecast Sync</button>
                     </div>
 
-                    <!-- Page 1: Model Config -->
-                    <div class="param-page active" id="tab-model">
+                    <!-- Bottom side: Predictive Parameters Content Card -->
+                    <div class="card" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+                        <h2>🤖 Predictive Parameters</h2>
+                        <div style="margin-top: 15px; flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                            
+                            <!-- Page 1: Model Config -->
+                            <div class="param-page" id="tab-model">
                         <p class="section-title">SARIMAX Architecture</p>
                         <div class="info-grid">
                             <div class="info-item">
@@ -302,13 +322,9 @@
                                 <div class="tag-list"><span class="tag">User-supplied</span><span class="tag">Highest priority</span></div>
                             </div>
                             <div class="info-item full-width">
-                                <label>Fallback Dataset (2026 Regulatory)</label>
+                                <label>Last Resort (Regulatory Data)</label>
                                 <span style="word-break:break-all">data/processed/local_prices/EPRA_Pump_Prices.csv</span>
-                                <div class="tag-list"><span class="tag">3,793 rows</span><span class="tag">Multi-town</span><span class="tag">Auto-used if no uploads</span></div>
-                            </div>
-                            <div class="info-item full-width">
-                                <label>Last Resort</label>
-                                <span style="word-break:break-all">data/processed/local_prices/kenyan_oil_prices_monthly_clean.csv</span>
+                                <div class="tag-list"><span class="tag">3,793 rows</span><span class="tag">Multi-town</span><span class="tag">Auto-fallback</span></div>
                             </div>
                         </div>
 
@@ -338,8 +354,8 @@
                         </div>
                     </div>
 
-                    <!-- Page 4: Accuracy Metrics -->
-                    <div class="param-page" id="tab-metrics">
+                    <!-- Page 4: Accuracy Metrics (Default Active) -->
+                    <div class="param-page active" id="tab-metrics">
                         <p class="section-title">Train/Validation Split</p>
                         <div class="info-grid">
                             <div class="info-item"><label>Train Set</label><span>80% of historical data</span></div>
@@ -375,16 +391,6 @@
                             <div class="info-item full-width"><label>MAPE</label><span>Mean Absolute Percentage Error — scale-independent accuracy (%)</span></div>
                         </div>
                     </div>
-
-                    <!-- Page 5: Forecast Sync -->
-                    <div class="param-page" id="tab-forecast" style="display: none; flex-direction: column; flex: 1;">
-                        <h2 style="font-size: 1.1em; margin-bottom: 10px;">📉 Latest User Forecast Sync</h2>
-                        <div id="adminPlaceholder" style="flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; opacity: 0.5; text-align: center; min-height: 350px;">
-                            <span style="font-size: 2em; margin-bottom: 10px;">💤</span>
-                            <span style="font-size: 0.9em;">No cached forecast available.<br>Switch to Engine to run one.</span>
-                        </div>
-                        <div id="adminChartContainer" style="display: none; flex: 1; min-height: 350px; position: relative;">
-                            <canvas id="adminForecastChart" style="position: absolute; width: 100%; height: 100%;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -403,7 +409,13 @@
                 const target = document.getElementById(tabId);
                 target.style.display = tabId === 'tab-forecast' ? 'flex' : 'block';
                 target.classList.add('active');
-                btn.classList.add('active');
+                // Handle Active tab class properly
+                // Find all tabs and make the matched one active
+                document.querySelectorAll('.param-tab').forEach(t => {
+                    if (t === btn || t.getAttribute('onclick').includes(tabId)) {
+                        t.classList.add('active');
+                    }
+                });
 
                 // Render chart if switching to forecast tab
                 if (tabId === 'tab-forecast') {
@@ -413,6 +425,15 @@
                     }
                 }
             }
+
+            // Set initial active button manually in case it's not the first one in DOM
+            window.addEventListener('DOMContentLoaded', () => {
+                document.querySelectorAll('.param-tab').forEach(t => {
+                    if(t.getAttribute('onclick').includes('tab-metrics')) {
+                        t.classList.add('active');
+                    }
+                });
+            });
 
             /* === THEME SYNCHRONIZATION === */
             const themeToggle = document.getElementById('themeToggle');

@@ -870,3 +870,160 @@ details.data-requirements .req-content {
     transform: none;
     box-shadow: none;
 }
+
+/* ─── Current Prices Ticker Strip ─── */
+.prices-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 20px 28px;
+    margin-bottom: 24px;
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.03),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    animation: slideUp 0.4s ease;
+}
+
+[data-theme='dark'] .prices-strip {
+    background: #000000;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.prices-strip-inner {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+}
+
+/* Individual price chip */
+.price-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 160px;
+    padding: 4px 8px;
+    animation: slideUp 0.35s ease both;
+}
+
+.price-chip:nth-child(1) { animation-delay: 0.05s; }
+.price-chip:nth-child(3) { animation-delay: 0.1s;  }
+.price-chip:nth-child(5) { animation-delay: 0.15s; }
+
+.price-chip-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+}
+
+.price-chip-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.price-chip-label {
+    font-size: 0.72em;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.price-chip-value {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    font-family: 'Outfit', 'Lexend', sans-serif;
+}
+
+[data-theme='dark'] .price-chip-value {
+    color: #f8f8f8;
+}
+
+/* Vertical divider between chips */
+.price-chip-divider {
+    width: 1px;
+    height: 44px;
+    background: var(--card-border);
+    flex-shrink: 0;
+    margin: 0 12px;
+    align-self: center;
+}
+
+[data-theme='dark'] .price-chip-divider {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Period / location meta label */
+.prices-meta {
+    font-size: 0.78em;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding-left: 8px;
+    letter-spacing: 0.01em;
+    border-top: 1px solid var(--card-border);
+    padding-top: 10px;
+    margin-top: 2px;
+}
+
+[data-theme='dark'] .prices-meta {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Loading state */
+.prices-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88em;
+    color: var(--text-secondary);
+    padding: 6px 0;
+}
+
+.prices-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning);
+    animation: pulse 1.4s ease infinite;
+    display: inline-block;
+}
+
+.prices-unavailable {
+    font-size: 0.88em;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Responsive: stack chips vertically on mobile */
+@media (max-width: 600px) {
+    .prices-strip {
+        padding: 16px 18px;
+    }
+
+    .prices-strip-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .price-chip-divider {
+        width: 100%;
+        height: 1px;
+        margin: 0;
+    }
+
+    .price-chip {
+        flex: unset;
+        width: 100%;
+    }
+}
