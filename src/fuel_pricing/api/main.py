@@ -186,19 +186,28 @@ async def upload_file(file: UploadFile = File(...)):
 
             if not (has_new or has_old):
                 file_path.unlink()  # Delete invalid file
-                return {
-                    "error": "Invalid CSV structure. Missing mandatory regulatory columns (From, To, Super (PMS))"
-                }
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid CSV structure. Missing mandatory regulatory columns (From, To, Super (PMS))"
+                )
 
             # Basic data validation
             if len(df) == 0:
                 file_path.unlink()
-                return {"error": "CSV file is empty"}
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="CSV file is empty"
+                )
 
+        except HTTPException:
+            raise
         except Exception as e:
             if file_path.exists():
                 file_path.unlink()
-            return {"error": f"Invalid CSV format: {str(e)}"}
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid CSV format: {str(e)}"
+            )
 
         logger.info(f"File uploaded successfully: {filename} ({file_size} bytes)")
         return {"message": f"{filename} uploaded successfully."}
@@ -207,7 +216,10 @@ async def upload_file(file: UploadFile = File(...)):
         raise
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
-        return {"error": f"Upload failed: {str(e)}"}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Upload failed: {str(e)}"
+        )
 
 
 def flexible_date_parse(date_val):
@@ -404,7 +416,10 @@ async def train_endpoint(town: str = Form(...)):
 
     except Exception as e:
         logger.error(f"Training error: {str(e)}")
-        return {"error": f"Training failed: {str(e)}"}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Training failed: {str(e)}"
+        )
 
 
 # -------------
@@ -417,14 +432,22 @@ async def get_metrics(fuel_type: str = "pms"):
         if not metrics_path.exists():
             generic_metrics_path = PROCESSED_DIR / "metrics.pkl"
             if not generic_metrics_path.exists():
-                return {"error": "No metrics available. Train the engine first."}
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No metrics available. Train the engine first."
+                )
             metrics_path = generic_metrics_path
 
         metrics = joblib.load(metrics_path)
         return metrics
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Metrics fetch error: {str(e)}")
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 # ----------------------
@@ -476,8 +499,16 @@ async def predict_price(
             if steps <= len(historic_exog):
                 active_exog = historic_exog.iloc[-steps:].copy()
             else:
-                repeats = (steps // len(historic_exog)) + 1
-                active_exog = pd.concat([historic_exog] * repeats).iloc[-steps:].copy()
+                # 🛠 IMPROVED: Use last-value persistence for future exogenous forecasting
+                # instead of repeating the entire historical block (tiling).
+                # This assumes a 'random walk' for external shocks which is a standard baseline.
+                last_known_vals = historic_exog.iloc[-1:]
+                # Create a dataframe of the same structure filled with the last known row
+                persistence_exog = pd.DataFrame(
+                    np.repeat(last_known_vals.values, steps, axis=0),
+                    columns=historic_exog.columns,
+                )
+                active_exog = persistence_exog.copy()
 
             model = FuelSARIMAXModel()
             forecast_result = model.predict(
@@ -531,7 +562,10 @@ async def predict_price(
 
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 # ---------------
@@ -629,7 +663,10 @@ def get_current_prices(town: str = "Nairobi"):
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
-            return {"error": "No price data available."}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No price data available."
+            )
         df = pd.read_csv(prices_file)
 
         # Filter by town if column exists
@@ -691,9 +728,14 @@ def get_current_prices(town: str = "Nairobi"):
             "town": town,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Current prices error: {str(e)}")
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @app.get("/towns/")
@@ -702,7 +744,10 @@ def get_towns():
     try:
         prices_file = PROCESSED_DIR / "local_prices" / "EPRA_Pump_Prices.csv"
         if not prices_file.exists():
-            return {"error": "No historical data available."}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No historical data available."
+            )
 
         df = pd.read_csv(prices_file)
         if "Town" not in df.columns:
@@ -713,9 +758,14 @@ def get_towns():
             list(set([str(t).strip() for t in df["Town"].dropna() if str(t).strip()]))
         )
         return {"towns": towns}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Towns fetch error: {str(e)}")
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @app.get("/history/")
@@ -731,7 +781,10 @@ def get_history_data(town: str = "Nairobi"):
             )
 
         if not prices_file.exists():
-            return {"error": "Historical repository missing."}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Historical repository missing."
+            )
 
         df = pd.read_csv(prices_file)
 
@@ -749,7 +802,10 @@ def get_history_data(town: str = "Nairobi"):
                 break
 
         if not date_col:
-            return {"error": "Time column not found in dataset."}
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Time column not found in dataset."
+            )
 
         df["month"] = df[date_col].apply(flexible_date_parse)
         df = df[df["month"].notna()]  # Drop NaT to avoid crash
@@ -789,6 +845,11 @@ def get_history_data(town: str = "Nairobi"):
             "ago": clean_series(ago_col),
             "kero": clean_series(kero_col),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"History data error: {str(e)}")
-        return {"error": str(e)}
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

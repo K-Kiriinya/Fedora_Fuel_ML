@@ -139,7 +139,7 @@ class FuelSARIMAXModel:
 
         # Create features
         df = self.create_features(df)
-        
+
         # Ensure only clean numeric rows are passed
         df = df.select_dtypes(include=[np.number])
         df = df.ffill().bfill().dropna()
@@ -151,7 +151,9 @@ class FuelSARIMAXModel:
 
         print(f"DEBUG: Training dataset size: {len(df)}")
         if len(df) < 5:
-            raise ValueError(f"Insufficient data for training: {len(df)} points found. Minimum 5 required.")
+            raise ValueError(
+                f"Insufficient data for training: {len(df)} points found. Minimum 5 required."
+            )
 
         # Train/test split for evaluation
         test_size = 0.2 if len(df) >= 10 else 0.1
@@ -170,17 +172,17 @@ class FuelSARIMAXModel:
         # Determine safe order for small datasets
         # Simple ARIMA(1,1,0) if N < 15 to avoid complex startup failure
         p, d, q = (1, 1, 1) if len(y_train) >= 15 else (1, 1, 0)
-        
+
         # Evaluation model (on training split)
         seasonal_train = (1, 1, 1, 12) if len(y_train) >= 24 else (0, 0, 0, 0)
-        
+
         eval_model = SARIMAX(
             y_train,
             exog=exog_train,
             order=(p, d, q),
             seasonal_order=seasonal_train,
-            enforce_stationarity=True,  # Changed to True for stability
-            enforce_invertibility=True,   # Changed to True for stability
+            enforce_stationarity=True,
+            enforce_invertibility=True,
         )
         eval_results = eval_model.fit(disp=False, maxiter=200)
 
@@ -196,7 +198,7 @@ class FuelSARIMAXModel:
         exog_full = df.drop(columns=["price"]).to_numpy()
 
         seasonal_full = (1, 1, 1, 12) if len(y_full) >= 24 else (0, 0, 0, 0)
-        
+
         # Re-calc order for full set
         p_f, d_f, q_f = (1, 1, 1) if len(y_full) >= 15 else (1, 1, 0)
 
@@ -245,19 +247,19 @@ class FuelSARIMAXModel:
 
         # Create features for future exogenous data
         future_exog = self.create_features(future_exog)
-        
+
         # Force exog to numpy if we trained with numpy
         exog_np = future_exog.to_numpy()
 
         forecast = self.results.get_forecast(steps=steps, exog=exog_np)
-        
+
         predicted = forecast.predicted_mean
         conf_int = forecast.conf_int()
 
         # Handle both pandas objects and numpy arrays from statsmodels results
         if hasattr(predicted, "to_numpy"):
             predicted = predicted.to_numpy()
-        
+
         if hasattr(conf_int, "iloc"):
             lower = conf_int.iloc[:, 0].to_numpy()
             upper = conf_int.iloc[:, 1].to_numpy()
