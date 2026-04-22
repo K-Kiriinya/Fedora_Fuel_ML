@@ -161,7 +161,6 @@ class FuelSARIMAXModel:
         train_df = df.iloc[:split_index]
         test_df = df.iloc[split_index:]
 
-        # Fixed dimensionality: Ensure 1D numpy arrays for endog
         y_train = train_df["price"].to_numpy().flatten()
         y_test = test_df["price"].to_numpy().flatten()
 
@@ -169,8 +168,7 @@ class FuelSARIMAXModel:
         exog_train = train_df.drop(columns=["price"]).to_numpy()
         exog_test = test_df.drop(columns=["price"]).to_numpy()
 
-        # Determine safe order for small datasets
-        # Simple ARIMA(1,1,0) if N < 15 to avoid complex startup failure
+        # Simple ARIMA(1,1,0) if N < 15 to avoid complex startup failure also for small datasets
         p, d, q = (1, 1, 1) if len(y_train) >= 15 else (1, 1, 0)
 
         # Evaluation model (on training split)
@@ -190,7 +188,6 @@ class FuelSARIMAXModel:
         forecast = eval_results.get_forecast(steps=len(y_test), exog=exog_test)
         predictions = forecast.predicted_mean
 
-        # Use .values to avoid any residual index-alignment issues
         metrics = self.calculate_metrics(y_test, predictions)
 
         # --- FINAL FULL-DATA REFIT FOR PRODUCTION FORECASTS ---
@@ -269,7 +266,6 @@ class FuelSARIMAXModel:
             upper = conf_int[:, 1]
 
         # Sanity check: Cap forecasts at reasonable fuel price extremes
-        # This prevents divergent linear trends from showing absurd values
         def sanity_cap(arr):
             return np.clip(arr, 0.0, 500.0)
 
